@@ -156,6 +156,15 @@ struct CustomizeView: View {
                     .background(Tone.wash, in: RoundedRectangle(cornerRadius: 8))
                     .disabled(store.isStopwatch).opacity(store.isStopwatch ? 0.4 : 1)
                 }
+                row("Hold ✓ to complete") {
+                    Toggle("", isOn: $store.settings.holdToComplete).toggleStyle(.switch).labelsHidden()
+                }
+                row("Clicking a task's timer") {
+                    Picker("", selection: $store.settings.timerClick) {
+                        ForEach(TimerClick.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .labelsHidden().fixedSize()
+                }
                 row("Completion sound") {
                     Toggle("", isOn: $store.settings.completionSound).toggleStyle(.switch).labelsHidden()
                 }

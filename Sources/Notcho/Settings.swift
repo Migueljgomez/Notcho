@@ -26,6 +26,8 @@ enum NotchLook: String, Codable, CaseIterable { case pastel = "Pastel", dark = "
 
 enum Unfinished: String, Codable, CaseIterable { case ask = "Ask me", carry = "Move to today", leave = "Leave in history" }
 
+enum TimerClick: String, Codable, CaseIterable { case pause = "Pause / Resume", restart = "Restart timer" }
+
 enum Shortcut: String, Codable, CaseIterable {
     case optN = "⌥ N", ctrlOptN = "⌃⌥ N", cmdShiftN = "⇧⌘ N", optSpace = "⌥ Space", off = "Off"
     /// (virtual key code, Carbon modifier mask)
@@ -60,6 +62,8 @@ struct Settings: Codable, Equatable {
     var closeAfter = 0.0        // seconds the notch waits after the pointer leaves; `stayOpen` = only click-away, Esc or ✕
     static let stayOpen = 3.5
     var notchLook = NotchLook.pastel
+    var holdToComplete = true   // Focus ✓ needs a press-and-hold
+    var timerClick = TimerClick.pause  // clicking the clock on the task already being timed
 
     init() {}
 
@@ -83,6 +87,8 @@ struct Settings: Codable, Equatable {
         panelHeight = (try? c.decodeIfPresent(Double.self, forKey: .panelHeight)) ?? d.panelHeight
         closeAfter = (try? c.decodeIfPresent(Double.self, forKey: .closeAfter)) ?? d.closeAfter
         notchLook = (try? c.decodeIfPresent(NotchLook.self, forKey: .notchLook)) ?? d.notchLook
+        holdToComplete = (try? c.decodeIfPresent(Bool.self, forKey: .holdToComplete)) ?? d.holdToComplete
+        timerClick = (try? c.decodeIfPresent(TimerClick.self, forKey: .timerClick)) ?? d.timerClick
     }
 
     /// Saved order plus any card kinds added since it was saved.

@@ -380,6 +380,7 @@ struct TasksCard: View {
     @State private var renameText = ""
     @State private var limitTaskID: UUID?
     @State private var reminderTaskID: UUID?
+    @State private var hoverClock: UUID?
 
     var body: some View {
         Card(color: Tone.tasks) {
@@ -451,6 +452,18 @@ struct TasksCard: View {
         !task.done && (store.focusTaskID ?? store.todo.first?.id) == task.id
     }
 
+    /// Another task: focus on it. The task being timed: pause/resume or restart, per Customize.
+    func clockTapped(_ task: TaskItem) {
+        let timing = store.focusTaskID == task.id && (store.focusState == .running || store.focusState == .paused)
+        guard timing, store.settings.timerClick == .pause else { return store.start(task: task.id) }
+        store.focusState == .running ? store.pause() : store.start()
+    }
+
+    func clockHelp(_ task: TaskItem) -> String {
+        guard store.focusTaskID == task.id, store.settings.timerClick == .pause else { return "Focus on this task" }
+        switch store.focusState { case .running: return "Pause"; case .paused: return "Resume"; default: return "Focus on this task" }
+    }
+
     /// The Focus card's timer icon. On the task being timed, a ring fills with the session's progress and the icon pulses while it runs.
     func focusIcon(_ task: TaskItem) -> some View {
         let timing = store.focusTaskID == task.id && store.focusState != .ready
@@ -461,12 +474,16 @@ struct TasksCard: View {
                 .symbolEffect(.pulse, isActive: timing && store.focusState == .running)
                 .frame(width: 24, height: 24)
                 .overlay {
-                    if timing {
+                    if timing || hoverClock == task.id {
                         Circle().stroke(Tone.ink.opacity(0.15), lineWidth: 2)
+                    }
+                    if timing {
                         Circle().trim(from: 0, to: done).stroke(Tone.ink, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                             .rotationEffect(.degrees(-90))
                     }
                 }
+                .contentShape(Circle())
+                .onHover { hoverClock = $0 ? task.id : (hoverClock == task.id ? nil : hoverClock) }
         }
     }
 
@@ -521,8 +538,8 @@ struct TasksCard: View {
                     .buttonStyle(.plain).font(.subheadline).foregroundStyle(Tone.inkSoft).help("Delete")
             } else {
                 HStack(spacing: 8) {
-                    Button { withAnimation(.easeOut(duration: 0.6)) { store.start(task: task.id) } } label: { focusIcon(task) }
-                        .help("Focus on this task")
+                    Button { withAnimation(.easeOut(duration: 0.6)) { clockTapped(task) } } label: { focusIcon(task) }
+                        .help(clockHelp(task))
                     Menu {
                         Button { store.start(task: task.id) } label: { Label("Focus", systemImage: "scope") }
                         Button { store.toggle(task.id) } label: { Label("Mark as Done", systemImage: "checkmark") }
@@ -639,6 +656,35 @@ extension Store {
 
 // MARK: - Focus
 
+/// The Focus card's green ✓. With `hold` on, a ring fills while it's pressed and the task completes when it closes.
+struct CompleteButton: View {
+    let hold: Bool
+    let action: () -> Void
+    @State private var progress = 0.0
+    static let holdTime = 0.8
+
+    var body: some View {
+        let face = Image(systemName: "checkmark").font(.callout.weight(.bold)).foregroundStyle(.white)
+            .frame(width: 32, height: 32)
+            .background { Circle().fill(Theme.done).brightness(-0.12) }
+            .overlay {
+                Circle().inset(by: -3).trim(from: 0, to: progress)
+                    .stroke(Theme.done, style: StrokeStyle(lineWidth: 2.5, lineCap: .round)).rotationEffect(.degrees(-90))
+            }
+            .contentShape(Circle())
+        if hold {
+            face.help("Hold to complete")
+                .onLongPressGesture(minimumDuration: Self.holdTime) {
+                    progress = 0; action()
+                } onPressingChanged: { pressing in
+                    withAnimation(pressing ? .linear(duration: Self.holdTime) : .easeOut(duration: 0.15)) { progress = pressing ? 1 : 0 }
+                }
+        } else {
+            Button(action: action) { face }.help("Complete focused task")
+        }
+    }
+}
+
 struct FocusCard: View {
     let store: Store
     @State private var showSetTime = false
@@ -665,11 +711,7 @@ struct FocusCard: View {
                         .lineLimit(1).frame(maxWidth: .infinity).padding(.vertical, 8)
                         .background(Tone.button, in: Capsule())
                 }
-                Button { store.completeFocus() } label: {
-                    Image(systemName: "checkmark").font(.callout.weight(.bold)).frame(width: 32, height: 32)
-                        .background(Tone.button, in: Circle())
-                }
-                .help("Complete focused task")
+                CompleteButton(hold: store.settings.holdToComplete) { store.completeFocus() }
             }
             .buttonStyle(.plain).foregroundStyle(Tone.onButton)
             HStack(spacing: 8) {
