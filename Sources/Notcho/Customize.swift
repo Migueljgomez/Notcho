@@ -134,7 +134,7 @@ struct CustomizeView: View {
     var focus: some View {
         Card(color: Tone.focus) {
             CardHeader(icon: "timer", title: "Focus")
-            VStack(spacing: Metrics.stack) {
+            ScrollView { VStack(spacing: Metrics.stack) {
                 row("Default timer") {
                     Picker("", selection: Binding(get: { store.settings.stopwatch }, set: { on in
                         store.endSession() // a running session keeps its own mode, so end it first
@@ -159,7 +159,7 @@ struct CustomizeView: View {
                 row("Hold ✓ to complete") {
                     Toggle("", isOn: $store.settings.holdToComplete).toggleStyle(.switch).labelsHidden()
                 }
-                row("Clicking a task's timer") {
+                row("Task timer click") {
                     Picker("", selection: $store.settings.timerClick) {
                         ForEach(TimerClick.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
@@ -201,7 +201,8 @@ struct CustomizeView: View {
                         .background(Tone.wash, in: RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain).frame(maxWidth: .infinity, alignment: .leading)
-            }
+            } }
+            .scrollIndicators(.never)
         }
     }
 
@@ -209,7 +210,7 @@ struct CustomizeView: View {
 
     var workspace: some View {
         Card(color: Tone.events) {
-            CardHeader(icon: "rectangle.3.group", title: "Customize workspace")
+            CardHeader(icon: "square.grid.2x2", title: "Customize workspace")
             Text("Drag to reorder. Toggle to show or hide.").font(.callout).foregroundStyle(Tone.inkSoft)
             List {
                 ForEach(store.settings.orderedCards) { kind in
@@ -235,6 +236,7 @@ struct CustomizeView: View {
                 }
             }
             .listStyle(.plain).scrollContentBackground(.hidden).scrollDisabled(true).foregroundStyle(Tone.ink)
+            .padding(.horizontal, -8) // List adds its own 8 pt row inset; this puts rows on the card's 16 pt line
             Text("Hidden cards keep their content.").font(.callout).foregroundStyle(Tone.inkSoft)
             Button("Reset layout") { withAnimation(.snappy) { store.settings.resetLayout() } }
             .buttonStyle(.plain).font(.callout).foregroundStyle(Tone.inkSoft)
