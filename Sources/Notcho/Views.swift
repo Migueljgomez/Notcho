@@ -325,7 +325,6 @@ struct Card<Content: View>: View {
             }
             .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("cards"))
                 .onChanged { grip?($0) }.onEnded { _ in grip?(nil) }, including: grip == nil ? .none : .all)
-            .help(grip == nil ? "" : "Drag to move this card")
             .frame(maxWidth: .infinity)
             VStack(alignment: .leading, spacing: Metrics.stack) { content }
                 .padding(.horizontal, Metrics.cardPadding).padding(.bottom, Metrics.cardPadding).padding(.top, 2)
@@ -409,7 +408,7 @@ struct TasksCard: View {
             }
             .listStyle(.plain).scrollContentBackground(.hidden).scrollIndicators(.never)
             .environment(\.defaultMinListRowHeight, 1)
-            .padding(.horizontal, -8) // row highlights reach 8 pt from the card edge; text stays on the 16 pt line
+            .padding(.horizontal, -16) // List insets rows 8 pt; rows pad 8 more: highlight 8 pt from the card edge, text on the 16 pt line
 
             HStack(spacing: 8) {
                 HStack(spacing: 6) {
@@ -422,8 +421,9 @@ struct TasksCard: View {
                     }
                     .font(.body)
                 }
-                .padding(.horizontal, 10).padding(.vertical, 7)
-                .background(Tone.wash, in: RoundedRectangle(cornerRadius: 9))
+                .padding(.horizontal, 8).padding(.vertical, 7)
+                .background(Tone.wash, in: RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, -8) // field 8 pt from the card edge, + on the 16 pt line
             }
         }
     }
@@ -459,11 +459,11 @@ struct TasksCard: View {
             } else {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
+                        Text(task.title).font(.body).strikethrough(task.done)
+                            .foregroundStyle(Tone.ink).fontWeight(isCurrent(task) ? .semibold : .regular)
                         if let p = store.projects.first(where: { $0.id == task.projectID }) {
                             Circle().fill(Palette.named(p.color)).brightness(-0.1).frame(width: 7, height: 7).help(p.name)
                         }
-                        Text(task.title).font(.body).strikethrough(task.done)
-                            .foregroundStyle(Tone.ink).fontWeight(isCurrent(task) ? .semibold : .regular)
                     }
                     if !task.done && (task.timeLimit != nil || task.reminder != nil || task.due != nil) {
                         HStack(spacing: 10) {
@@ -745,9 +745,10 @@ struct NotepadCard: View {
             Rectangle().fill(Tone.ink.opacity(0.12)).frame(height: 1)
             ZStack(alignment: .topLeading) {
                 if store.notes.isEmpty {
-                    Text("Write something down…").foregroundStyle(Tone.inkSoft).padding(.leading, 5).allowsHitTesting(false)
+                    Text("Write something down…").foregroundStyle(Tone.inkSoft).allowsHitTesting(false)
                 }
-                TextEditor(text: $store.notes).scrollContentBackground(.hidden).focused(field, equals: .notes)
+                TextEditor(text: $store.notes).scrollContentBackground(.hidden).scrollIndicators(.never)
+                    .padding(.leading, -5).focused(field, equals: .notes)
                     .onKeyPress(.return, phases: .down) { press in
                         press.modifiers.contains(.command) && lineToTask() ? .handled : .ignored
                     }
@@ -838,6 +839,7 @@ struct EventsCard: View {
     func tile<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         content().padding(8).frame(maxWidth: .infinity, alignment: .leading)
             .background(Tone.wash, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .padding(.horizontal, -8) // tile 8 pt from the card edge, its content on the 16 pt line
     }
 
     func reminderTile(_ t: TaskItem) -> some View {

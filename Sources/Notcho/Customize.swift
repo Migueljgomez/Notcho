@@ -44,7 +44,7 @@ struct CustomizeView: View {
                     Picker("", selection: $store.settings.notchLook) {
                         ForEach(NotchLook.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
-                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    .labelsHidden().fixedSize()
                 }
                 .help("Match my Mac: pastel in Light mode, the dark island in Dark mode")
                 Dotted()
