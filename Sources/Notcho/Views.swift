@@ -826,8 +826,10 @@ struct EventsCard: View {
                             Button("Connect Calendar") { store.connectCalendar() }.font(.callout).padding(.top, Metrics.stack)
                         }
                     }
+                    .padding(.horizontal, 8)
                 }
                 .scrollIndicators(.never)
+                .padding(.horizontal, -8) // the scroll view clips: widen it so tiles can reach 8 pt from the card edge
             }
         }
     }
