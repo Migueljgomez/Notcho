@@ -187,16 +187,16 @@ struct PlannerSidebar: View {
             row(.goals, "Goals", "target", Palette.rose, store.objectives(in: store.thisWeek).filter { !store.isAchieved($0) }.count)
             row(.notes, "Notes", "note.text", Palette.lavender, nil)
 
-            Text("PROJECTS").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+            Text("PROJECTS").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
                 .padding(.top, 18).padding(.bottom, 4).padding(.horizontal, 10)
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(store.projects) { p in
                         if renaming == p.id {
                             HStack(spacing: 9) {
-                                Image(systemName: "circle.fill").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.named(p.color)).frame(width: 18)
+                                Image(systemName: "circle.fill").font(.callout.weight(.semibold)).foregroundStyle(Palette.named(p.color)).frame(width: 18)
                                 TextField("Project name", text: $renameText)
-                                    .textFieldStyle(.plain).font(.system(size: 13)).focused($renameFocused)
+                                    .textFieldStyle(.plain).font(.body).focused($renameFocused)
                                     .onSubmit { store.renameProject(p.id, to: renameText); renaming = nil }
                                     .onExitCommand { renaming = nil }
                             }
@@ -221,9 +221,9 @@ struct PlannerSidebar: View {
                         }
                     }
                     HStack(spacing: 8) {
-                        Image(systemName: "plus").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+                        Image(systemName: "plus").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
                         TextField("New project", text: $newProject)
-                            .textFieldStyle(.plain).font(.system(size: 13))
+                            .textFieldStyle(.plain).font(.body)
                             .onSubmit {
                                 let name = newProject.trimmingCharacters(in: .whitespaces)
                                 guard !name.isEmpty else { return }
@@ -241,7 +241,7 @@ struct PlannerSidebar: View {
                 PlannerWindow.shared.applyAppearance()
             } label: {
                 Label(store.settings.plannerDark ? "Light mode" : "Dark mode", systemImage: store.settings.plannerDark ? "sun.max" : "moon")
-                    .font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.pInkSoft)
+                    .font(.callout.weight(.medium)).foregroundStyle(Palette.pInkSoft)
                     .padding(.horizontal, 10).padding(.vertical, 8)
             }
             .buttonStyle(.plain).padding(.bottom, 8)
@@ -253,10 +253,10 @@ struct PlannerSidebar: View {
     func row(_ s: PlannerSection, _ title: String, _ icon: String, _ tint: Color, _ count: Int?) -> some View {
         Button { section = s } label: {
             HStack(spacing: 9) {
-                Image(systemName: icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(tint).frame(width: 18)
-                Text(title).font(.system(size: 13, weight: section == s ? .semibold : .regular)).lineLimit(1)
+                Image(systemName: icon).font(.callout.weight(.semibold)).foregroundStyle(tint).frame(width: 18)
+                Text(title).font(.body.weight(section == s ? .semibold : .regular)).lineLimit(1)
                 Spacer()
-                if let count, count > 0 { Text("\(count)").font(.system(size: 11)).foregroundStyle(Palette.pInkSoft) }
+                if let count, count > 0 { Text("\(count)").font(.subheadline).foregroundStyle(Palette.pInkSoft) }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
             .background(section == s ? Palette.pWash : .clear, in: RoundedRectangle(cornerRadius: 7))
@@ -352,7 +352,7 @@ struct PlannerList: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(title).font(.system(size: 26, weight: .bold))
+                    Text(title).font(.largeTitle.weight(.bold))
                     Spacer()
                     if section == .today {
                         Button { PlannerRouter.shared.planning = true } label: { Label("Plan your day", systemImage: "sun.horizon") }
@@ -361,7 +361,7 @@ struct PlannerList: View {
                             .buttonStyle(Pill(fill: Palette.pWash))
                     }
                 }
-                if let subtitle { Text(subtitle).font(.system(size: 13)).foregroundStyle(Palette.pInkSoft) }
+                if let subtitle { Text(subtitle).font(.body).foregroundStyle(Palette.pInkSoft) }
                 if section == .today { ThisWeekStrip(store: store).padding(.top, 6); WorkloadMeter(store: store).padding(.top, 4); progress }
             }
             .padding(.horizontal, 28).padding(.top, 38).padding(.bottom, 14)
@@ -372,8 +372,8 @@ struct PlannerList: View {
 
             if section != .done {
                 HStack(spacing: 8) {
-                    Image(systemName: "plus").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
-                    TextField("Add task", text: $newTask).textFieldStyle(.plain).font(.system(size: 14)).focused($adding)
+                    Image(systemName: "plus").font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
+                    TextField("Add task", text: $newTask).textFieldStyle(.plain).font(.title3).focused($adding)
                         .onSubmit(add)
                 }
                 .padding(10)
@@ -385,7 +385,7 @@ struct PlannerList: View {
                 LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                         if let heading = group.0 {
-                            Text(heading).font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+                            Text(heading).font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
                                 .padding(.top, 10).padding(.leading, 4)
                         }
                         ForEach(group.1) { t in
@@ -396,7 +396,7 @@ struct PlannerList: View {
                     }
                     if groups.allSatisfy({ $0.1.isEmpty }) {
                         Text(section == .today ? "Nothing planned. Add a task, or drag one here from Upcoming or Someday." : "Nothing here yet.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.pInkSoft).padding(.top, 20)
+                            .font(.body).foregroundStyle(Palette.pInkSoft).padding(.top, 20)
                     }
                 }
                 .padding(.horizontal, 24).padding(.bottom, 24)
@@ -448,31 +448,31 @@ struct PlannerRow: View {
         HStack(alignment: .top, spacing: 10) {
             Button { store.toggle(task.id) } label: {
                 Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 16)).foregroundStyle(task.done ? Palette.sage : Palette.pInkSoft)
+                    .font(.title2).foregroundStyle(task.done ? Palette.sage : Palette.pInkSoft)
             }
             .buttonStyle(.plain)
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     if let s = task.startTime { chip(s.formatted(date: .omitted, time: .shortened), Palette.named(project?.color ?? "sand")) }
-                    Text(task.title).font(.system(size: 14)).strikethrough(task.done).foregroundStyle(task.done ? Palette.pInkSoft : Palette.pInk)
+                    Text(task.title).font(.title3).strikethrough(task.done).foregroundStyle(task.done ? Palette.pInkSoft : Palette.pInk)
                 }
                 let subs = task.subtasks ?? []
                 if !subs.isEmpty {
-                    Text("\(subs.filter(\.done).count)/\(subs.count) subtasks").font(.system(size: 11)).foregroundStyle(Palette.pInkSoft)
+                    Text("\(subs.filter(\.done).count)/\(subs.count) subtasks").font(.subheadline).foregroundStyle(Palette.pInkSoft)
                 }
                 HStack(spacing: 10) {
                     if let o = store.objectives.first(where: { $0.id == task.objectiveID }) {
-                        Label(o.title, systemImage: "target").font(.system(size: 11, weight: .medium)).foregroundStyle(Palette.rose).brightness(-0.25).lineLimit(1)
+                        Label(o.title, systemImage: "target").font(.subheadline.weight(.medium)).foregroundStyle(Palette.rose).brightness(-0.25).lineLimit(1)
                     }
                     if let p = project {
-                        Text("# \(p.name)").font(.system(size: 11, weight: .medium)).foregroundStyle(Palette.named(p.color).opacity(1)).brightness(-0.25)
+                        Text("# \(p.name)").font(.subheadline.weight(.medium)).foregroundStyle(Palette.named(p.color).opacity(1)).brightness(-0.25)
                     }
                     if let due = task.due {
                         Label(due.formatted(.dateTime.month(.abbreviated).day()), systemImage: "flag")
-                            .font(.system(size: 11)).foregroundStyle(due < store.today ? .red : Palette.pInkSoft)
+                            .font(.subheadline).foregroundStyle(due < store.today ? .red : Palette.pInkSoft)
                     }
-                    if task.reminder != nil { Image(systemName: "bell").font(.system(size: 10)).foregroundStyle(Palette.pInkSoft) }
-                    if task.notes?.isEmpty == false { Image(systemName: "note.text").font(.system(size: 10)).foregroundStyle(Palette.pInkSoft) }
+                    if task.reminder != nil { Image(systemName: "bell").font(.footnote).foregroundStyle(Palette.pInkSoft) }
+                    if task.notes?.isEmpty == false { Image(systemName: "note.text").font(.footnote).foregroundStyle(Palette.pInkSoft) }
                 }
             }
             Spacer(minLength: 8)
@@ -483,7 +483,7 @@ struct PlannerRow: View {
             let actual = store.actualMinutes(task.id)
             if task.timeLimit != nil || actual > 0 {
                 Text(actual > 0 ? "\(estimate(actual)) / \(task.timeLimit.map(estimate) ?? "–")" : estimate(task.timeLimit!))
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .font(.subheadline.weight(.medium).monospacedDigit())
                     .foregroundStyle(actual > (task.timeLimit ?? .max) ? Color.orange : Palette.pInk)
                     .help(actual > 0 ? "Actual / planned" : "Planned")
                     .padding(.horizontal, 6).padding(.vertical, 2)
@@ -497,7 +497,7 @@ struct PlannerRow: View {
     }
 
     func chip(_ text: String, _ color: Color) -> some View {
-        Text(text).font(.system(size: 10, weight: .semibold)).foregroundStyle(.white)
+        Text(text).font(.footnote.weight(.semibold)).foregroundStyle(.white)
             .padding(.horizontal, 5).padding(.vertical, 2)
             .background(color, in: RoundedRectangle(cornerRadius: 4))
     }
@@ -529,11 +529,11 @@ struct TaskDetail: View {
                         Spacer()
                         Button(action: close) { Image(systemName: "xmark") }.buttonStyle(.plain).foregroundStyle(Palette.pInkSoft)
                     }
-                    .font(.system(size: 12))
+                    .font(.callout)
                     .padding(.top, 30)
 
                     TextField("Title", text: $title, axis: .vertical)
-                        .textFieldStyle(.plain).font(.system(size: 20, weight: .semibold))
+                        .textFieldStyle(.plain).font(.title.weight(.semibold))
                         .onChange(of: title) { later() }
 
                     field("Project") {
@@ -579,20 +579,20 @@ struct TaskDetail: View {
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Subtasks").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+                        Text("Subtasks").font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
                         ForEach(task.subtasks ?? []) { s in
                             HStack(spacing: 8) {
                                 Button {
                                     store.update(id) { t in if let i = t.subtasks?.firstIndex(where: { $0.id == s.id }) { t.subtasks![i].done.toggle() } }
                                 } label: { Image(systemName: s.done ? "checkmark.circle.fill" : "circle") }
                                 .buttonStyle(.plain).foregroundStyle(s.done ? Palette.sage : Palette.pInkSoft)
-                                Text(s.title).font(.system(size: 13)).strikethrough(s.done)
+                                Text(s.title).font(.body).strikethrough(s.done)
                                 Spacer()
                                 Button { store.update(id) { $0.subtasks?.removeAll { $0.id == s.id } } } label: { Image(systemName: "minus.circle") }
                                     .buttonStyle(.plain).foregroundStyle(Palette.pInkSoft)
                             }
                         }
-                        TextField("Add subtask", text: $newSub).textFieldStyle(.plain).font(.system(size: 13))
+                        TextField("Add subtask", text: $newSub).textFieldStyle(.plain).font(.body)
                             .onSubmit {
                                 let t = newSub.trimmingCharacters(in: .whitespaces)
                                 guard !t.isEmpty else { return }
@@ -602,16 +602,16 @@ struct TaskDetail: View {
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Notes").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+                        Text("Notes").font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
                         TextEditor(text: $notes)
-                            .font(.system(size: 13)).scrollContentBackground(.hidden)
+                            .font(.body).scrollContentBackground(.hidden)
                             .frame(minHeight: 160)
                             .padding(8).background(Palette.card, in: RoundedRectangle(cornerRadius: 8))
                             .onChange(of: notes) { later() }
                     }
 
                     Button(role: .destructive) { save(); store.delete(id); close() } label: { Label("Delete task", systemImage: "trash") }
-                        .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(.red.opacity(0.8))
+                        .buttonStyle(.plain).font(.callout).foregroundStyle(.red.opacity(0.8))
                 }
                 .padding(.horizontal, 20).padding(.bottom, 20)
             }
@@ -647,7 +647,7 @@ struct TaskDetail: View {
 
     func field<C: View>(_ label: String, @ViewBuilder _ content: () -> C) -> some View {
         HStack(spacing: 10) {
-            Text(label).font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.pInkSoft).frame(width: 74, alignment: .leading)
+            Text(label).font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft).frame(width: 74, alignment: .leading)
             content()
             Spacer(minLength: 0)
         }
@@ -662,7 +662,7 @@ struct OptionalDate: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Text(label).font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.pInkSoft).frame(width: 74, alignment: .leading)
+            Text(label).font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft).frame(width: 74, alignment: .leading)
             if let d = date {
                 DatePicker("", selection: Binding(get: { d }, set: { date = $0 }), displayedComponents: components)
                     .labelsHidden().fixedSize()
@@ -695,11 +695,11 @@ struct WorkloadMeter: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text("\(estimate(planned)) planned · \(estimate(left)) left until \(end.formatted(date: .omitted, time: .shortened))")
-                        .font(.system(size: 12, weight: .medium).monospacedDigit())
-                    if over { Text("Over by \(estimate(planned - left))").font(.system(size: 11, weight: .semibold)).foregroundStyle(.orange) }
+                        .font(.callout.weight(.medium).monospacedDigit())
+                    if over { Text("Over by \(estimate(planned - left))").font(.subheadline.weight(.semibold)).foregroundStyle(.orange) }
                 }
                 if unestimated > 0 {
-                    Text("\(unestimated) task\(unestimated == 1 ? "" : "s") without an estimate").font(.system(size: 11)).foregroundStyle(Palette.pInkSoft)
+                    Text("\(unestimated) task\(unestimated == 1 ? "" : "s") without an estimate").font(.subheadline).foregroundStyle(Palette.pInkSoft)
                 }
             }
             .foregroundStyle(over ? Color.orange : Palette.pInk)
@@ -730,8 +730,8 @@ struct PlanYourDay: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Plan your day").font(.system(size: 22, weight: .bold))
-                Text(Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day())).font(.system(size: 13)).foregroundStyle(Palette.pInkSoft)
+                Text("Plan your day").font(.title.weight(.bold))
+                Text(Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day())).font(.body).foregroundStyle(Palette.pInkSoft)
             }
             WorkloadMeter(store: store)
 
@@ -741,7 +741,7 @@ struct PlanYourDay: View {
                     ForEach(suggestions, id: \.0) { s in group(s.0, s.1, s.2, onToday: false) }
                     if suggestions.isEmpty {
                         Text("Nothing else waiting. Add tasks in the Planner and they'll show up here.")
-                            .font(.system(size: 12)).foregroundStyle(Palette.pInkSoft)
+                            .font(.callout).foregroundStyle(Palette.pInkSoft)
                     }
                 }
             }
@@ -760,16 +760,16 @@ struct PlanYourDay: View {
 
     func group(_ title: String, _ icon: String, _ tasks: [TaskItem], onToday: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label(title, systemImage: icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+            Label(title, systemImage: icon).font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
             if tasks.isEmpty {
-                Text("Nothing yet").font(.system(size: 12)).foregroundStyle(Palette.pInkSoft)
+                Text("Nothing yet").font(.callout).foregroundStyle(Palette.pInkSoft)
             }
             ForEach(tasks) { t in
                 HStack(spacing: 10) {
-                    Text(t.title).font(.system(size: 13)).lineLimit(1)
+                    Text(t.title).font(.body).lineLimit(1)
                     if let due = t.due {
                         Text(due < store.today ? "overdue" : "due " + due.formatted(.dateTime.month(.abbreviated).day()))
-                            .font(.system(size: 11)).foregroundStyle(due < store.today ? .red : Palette.pInkSoft)
+                            .font(.subheadline).foregroundStyle(due < store.today ? .red : Palette.pInkSoft)
                     }
                     Spacer()
                     EstimateControl(store: store, task: t)
@@ -815,12 +815,12 @@ struct EstimateControl: View {
             Button { let m = (task.timeLimit ?? 0) - 15; store.setTimeLimit(task.id, minutes: m > 0 ? m : nil) } label: {
                 Image(systemName: "minus").frame(width: 22, height: 22).contentShape(Rectangle())
             }
-            Text(task.timeLimit.map(estimate) ?? "–:––").font(.system(size: 11, weight: .medium).monospacedDigit()).frame(minWidth: 34)
+            Text(task.timeLimit.map(estimate) ?? "–:––").font(.subheadline.weight(.medium).monospacedDigit()).frame(minWidth: 34)
             Button { store.setTimeLimit(task.id, minutes: (task.timeLimit ?? 0) + 15) } label: {
                 Image(systemName: "plus").frame(width: 22, height: 22).contentShape(Rectangle())
             }
         }
-        .buttonStyle(.plain).font(.system(size: 10, weight: .bold)).foregroundStyle(Palette.pInk)
+        .buttonStyle(.plain).font(.footnote.weight(.bold)).foregroundStyle(Palette.pInk)
         .background(Palette.pWash, in: Capsule())
         .help("Time estimate")
     }
@@ -839,15 +839,15 @@ struct PlanPage: View {
             Button { withAnimation(.snappy) { open.toggle() } } label: {
                 Label("Plan", systemImage: open ? "chevron.down" : "chevron.right")
             }
-            .buttonStyle(.plain).font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+            .buttonStyle(.plain).font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
             .help("Saved as \(NoteFiles.planURL(project).lastPathComponent) in iCloud Drive → Notch → Plans")
             if open {
                 ZStack(alignment: .topLeading) {
                     if text.isEmpty {
                         Text("Goals, context, decisions, links… Agents can read this later.")
-                            .font(.system(size: 13)).foregroundStyle(Palette.pInkSoft).padding(.horizontal, 13).padding(.vertical, 8)
+                            .font(.body).foregroundStyle(Palette.pInkSoft).padding(.horizontal, 13).padding(.vertical, 8)
                     }
-                    TextEditor(text: $text).font(.system(size: 13)).scrollContentBackground(.hidden).padding(8)
+                    TextEditor(text: $text).font(.body).scrollContentBackground(.hidden).padding(8)
                 }
                 .frame(minHeight: 110, maxHeight: 200)
                 .background(Palette.card, in: RoundedRectangle(cornerRadius: 10))
@@ -879,12 +879,12 @@ struct NotesView: View {
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Notes").font(.system(size: 26, weight: .bold)).padding(.top, 38).padding(.bottom, 10).padding(.horizontal, 8)
+                Text("Notes").font(.largeTitle.weight(.bold)).padding(.top, 38).padding(.bottom, 10).padding(.horizontal, 8)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach([today] + files.map(\.day).filter { $0 != today }, id: \.self) { d in
                             Button { pick(d) } label: {
-                                Text(label(d)).font(.system(size: 13, weight: day == d ? .semibold : .regular))
+                                Text(label(d)).font(.body.weight(day == d ? .semibold : .regular))
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal, 10).padding(.vertical, 6)
                                     .background(day == d ? Palette.pWash : .clear, in: RoundedRectangle(cornerRadius: 7))
@@ -894,16 +894,16 @@ struct NotesView: View {
                         }
                     }
                 }
-                Text("iCloud Drive → Notch → Notes").font(.system(size: 11)).foregroundStyle(Palette.pInkSoft).padding(8)
+                Text("iCloud Drive → Notch → Notes").font(.subheadline).foregroundStyle(Palette.pInkSoft).padding(8)
             }
             .frame(width: 210).padding(.horizontal, 12)
             Divider()
             VStack(alignment: .leading, spacing: 8) {
-                Text(day.map(label) ?? "").font(.system(size: 20, weight: .semibold)).padding(.top, 38)
+                Text(day.map(label) ?? "").font(.title.weight(.semibold)).padding(.top, 38)
                 if day == today {
-                    Text("Today's note is the notch Notepad. Edits here show up there too.").font(.system(size: 12)).foregroundStyle(Palette.pInkSoft)
+                    Text("Today's note is the notch Notepad. Edits here show up there too.").font(.callout).foregroundStyle(Palette.pInkSoft)
                 }
-                TextEditor(text: $text).font(.system(size: 14)).scrollContentBackground(.hidden)
+                TextEditor(text: $text).font(.title3).scrollContentBackground(.hidden)
                     .padding(10).background(Palette.card, in: RoundedRectangle(cornerRadius: 10))
             }
             .padding(.horizontal, 24).padding(.bottom, 24)
@@ -952,26 +952,26 @@ struct WrapUp: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Wrap up your day").font(.system(size: 22, weight: .bold))
+                Text("Wrap up your day").font(.title.weight(.bold))
                 let focus = store.focusLog.filter { Calendar.current.isDateInToday($0.date) }.reduce(0) { $0 + $1.seconds }
-                Text("\(finishedToday.count) done · \(durationText(focus)) focused").font(.system(size: 13)).foregroundStyle(Palette.pInkSoft)
+                Text("\(finishedToday.count) done · \(durationText(focus)) focused").font(.body).foregroundStyle(Palette.pInkSoft)
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Label("Done today", systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
-                        if finishedToday.isEmpty { Text("Nothing checked off yet. That's okay.").font(.system(size: 12)).foregroundStyle(Palette.pInkSoft) }
+                        Label("Done today", systemImage: "checkmark.circle.fill").font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
+                        if finishedToday.isEmpty { Text("Nothing checked off yet. That's okay.").font(.callout).foregroundStyle(Palette.pInkSoft) }
                         ForEach(finishedToday) { t in
-                            Text("✓ " + t.title).font(.system(size: 13)).padding(.horizontal, 10).padding(.vertical, 6)
+                            Text("✓ " + t.title).font(.body).padding(.horizontal, 10).padding(.vertical, 6)
                                 .frame(maxWidth: .infinity, alignment: .leading).background(Palette.card, in: RoundedRectangle(cornerRadius: 8))
                         }
                     }
                     VStack(alignment: .leading, spacing: 6) {
-                        Label("Still open", systemImage: "circle").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
-                        if store.todo.isEmpty { Text("All clear.").font(.system(size: 12)).foregroundStyle(Palette.pInkSoft) }
+                        Label("Still open", systemImage: "circle").font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
+                        if store.todo.isEmpty { Text("All clear.").font(.callout).foregroundStyle(Palette.pInkSoft) }
                         ForEach(store.todo) { t in
                             HStack(spacing: 8) {
-                                Text(t.title).font(.system(size: 13)).lineLimit(1)
+                                Text(t.title).font(.body).lineLimit(1)
                                 Spacer()
                                 Button("Tomorrow") { store.schedule(t.id, day: Calendar.current.date(byAdding: .day, value: 1, to: store.today)) }
                                     .buttonStyle(Pill(fill: Palette.pWash))
@@ -982,13 +982,13 @@ struct WrapUp: View {
                         }
                     }
                     VStack(alignment: .leading, spacing: 6) {
-                        Label("Highlights", systemImage: "sparkles").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+                        Label("Highlights", systemImage: "sparkles").font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
                         ZStack(alignment: .topLeading) {
                             if highlights.isEmpty {
                                 Text("What went well? What did you learn? Saved to today's note.")
-                                    .font(.system(size: 13)).foregroundStyle(Palette.pInkSoft).padding(.horizontal, 13).padding(.vertical, 8)
+                                    .font(.body).foregroundStyle(Palette.pInkSoft).padding(.horizontal, 13).padding(.vertical, 8)
                             }
-                            TextEditor(text: $highlights).font(.system(size: 13)).scrollContentBackground(.hidden).padding(8)
+                            TextEditor(text: $highlights).font(.body).scrollContentBackground(.hidden).padding(8)
                         }
                         .frame(height: 90).background(Palette.card, in: RoundedRectangle(cornerRadius: 8))
                     }
@@ -1026,10 +1026,10 @@ struct ThisWeekStrip: View {
     var body: some View {
         let goals = store.objectives(in: store.thisWeek)
         HStack(spacing: 8) {
-            Text("This week").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+            Text("This week").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
             ForEach(goals) { o in GoalChip(store: store, objective: o) }
             if adding {
-                TextField("New goal", text: $newGoal).textFieldStyle(.plain).font(.system(size: 12)).frame(width: 160)
+                TextField("New goal", text: $newGoal).textFieldStyle(.plain).font(.callout).frame(width: 160)
                     .padding(.horizontal, 10).padding(.vertical, 5).background(Palette.card, in: Capsule())
                     .onSubmit { store.addObjective(newGoal); newGoal = ""; adding = false }
                     .onExitCommand { adding = false }
@@ -1053,7 +1053,7 @@ struct GoalChip: View {
             Text(objective.title).lineLimit(1)
             if n > 0 { Text("\(d)/\(n)").monospacedDigit().foregroundStyle(Palette.pInkSoft) }
         }
-        .font(.system(size: 12, weight: .medium))
+        .font(.callout.weight(.medium))
         .padding(.horizontal, 10).padding(.vertical, 5)
         .background(alignment: .leading) {
             GeometryReader { g in
@@ -1086,16 +1086,16 @@ struct GoalsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Goals").font(.system(size: 26, weight: .bold))
+                    Text("Goals").font(.largeTitle.weight(.bold))
                     Text("2–3 goals a week. Link tasks to a goal from their details; progress fills as they get done.")
-                        .font(.system(size: 13)).foregroundStyle(Palette.pInkSoft)
+                        .font(.body).foregroundStyle(Palette.pInkSoft)
                 }
                 .padding(.top, 38)
 
                 week(store.thisWeek, current: true)
                 HStack(spacing: 8) {
-                    Image(systemName: "plus").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
-                    TextField("Add a goal for this week", text: $newGoal).textFieldStyle(.plain).font(.system(size: 14))
+                    Image(systemName: "plus").font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
+                    TextField("Add a goal for this week", text: $newGoal).textFieldStyle(.plain).font(.title3)
                         .onSubmit { store.addObjective(newGoal); newGoal = "" }
                 }
                 .padding(10).background(Palette.card.opacity(0.7), in: RoundedRectangle(cornerRadius: 10))
@@ -1116,20 +1116,20 @@ struct GoalsView: View {
         let hit = goals.filter { store.isAchieved($0) }.count
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(current ? "This week" : title(w)).font(.system(size: 13, weight: .semibold))
+                Text(current ? "This week" : title(w)).font(.body.weight(.semibold))
                 Spacer()
-                if !goals.isEmpty { Text("\(hit) of \(goals.count) achieved").font(.system(size: 12)).foregroundStyle(Palette.pInkSoft) }
+                if !goals.isEmpty { Text("\(hit) of \(goals.count) achieved").font(.callout).foregroundStyle(Palette.pInkSoft) }
             }
-            if goals.isEmpty && current { Text("No goals yet.").font(.system(size: 12)).foregroundStyle(Palette.pInkSoft) }
+            if goals.isEmpty && current { Text("No goals yet.").font(.callout).foregroundStyle(Palette.pInkSoft) }
             ForEach(goals) { o in
                 let (d, n) = store.progress(o)
                 let achieved = store.isAchieved(o)
                 HStack(spacing: 10) {
                     Image(systemName: achieved ? "checkmark.circle.fill" : current ? "target" : "xmark.circle")
                         .foregroundStyle(achieved ? Palette.sage : current ? Palette.rose : Color.red.opacity(0.6))
-                    Text(o.title).font(.system(size: 14))
+                    Text(o.title).font(.title3)
                     Spacer()
-                    Text(n == 0 ? "no tasks linked" : "\(d)/\(n) tasks").font(.system(size: 12).monospacedDigit()).foregroundStyle(Palette.pInkSoft)
+                    Text(n == 0 ? "no tasks linked" : "\(d)/\(n) tasks").font(.callout.monospacedDigit()).foregroundStyle(Palette.pInkSoft)
                     if current {
                         Button(o.achieved == true ? "Undo" : "Achieved") {
                             if let i = store.objectives.firstIndex(where: { $0.id == o.id }) { store.objectives[i].achieved = o.achieved == true ? nil : true }

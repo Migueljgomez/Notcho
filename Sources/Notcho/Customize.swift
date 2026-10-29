@@ -36,7 +36,7 @@ struct CustomizeView: View {
                     .onChange(of: store.settings.shortcut) { HotKey.register(store.settings.shortcut) }
                 }
                 Dotted()
-                Text("Your day").font(.system(size: 13, weight: .semibold)).frame(maxWidth: .infinity, alignment: .leading)
+                Text("Your day").font(.body.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
                 row("Day starts at") {
                     Picker("", selection: $store.settings.dayStartHour) {
                         ForEach(0..<12) { h in Text(hourLabel(h)).tag(h) }
@@ -88,11 +88,11 @@ struct CustomizeView: View {
                 }
                 .help("Tasks appear in a Notch list in Reminders, which iCloud syncs to your iPhone. Changes there come back here.")
                 if !store.syncStatus.isEmpty {
-                    Text(store.syncStatus).font(.system(size: 11))
+                    Text(store.syncStatus).font(.subheadline)
                         .foregroundStyle(store.syncStatus.hasPrefix("Synced") ? Palette.inkSoft : .red)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                if let loginError { Text(loginError).font(.system(size: 11)).foregroundStyle(.red) }
+                if let loginError { Text(loginError).font(.subheadline).foregroundStyle(.red) }
             } }
             .scrollIndicators(.never)
         }
@@ -139,7 +139,7 @@ struct CustomizeView: View {
                         Text("\(store.focusMinutes) min").monospacedDigit().frame(minWidth: 52)
                         Button { store.setDuration(store.focusMinutes + 5) } label: { Image(systemName: "plus") }
                     }
-                    .buttonStyle(.plain).font(.system(size: 13, weight: .medium))
+                    .buttonStyle(.plain).font(.body.weight(.medium))
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .background(Palette.wash, in: RoundedRectangle(cornerRadius: 8))
                     .disabled(store.isStopwatch).opacity(store.isStopwatch ? 0.4 : 1)
@@ -147,13 +147,13 @@ struct CustomizeView: View {
                 row("Completion sound") {
                     Toggle("", isOn: $store.settings.completionSound).toggleStyle(.switch).labelsHidden()
                 }
-                Text("A task's time limit overrides the default.").font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
+                Text("A task's time limit overrides the default.").font(.callout).foregroundStyle(Palette.inkSoft)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Dotted()
                 HStack {
-                    Text("Permissions").font(.system(size: 13, weight: .semibold))
+                    Text("Permissions").font(.body.weight(.semibold))
                     Spacer()
-                    Text("v1.0").font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
+                    Text("v1.0").font(.callout).foregroundStyle(Palette.inkSoft)
                 }
                 HStack(spacing: 14) {
                     Label("Calendar: \(store.calendarAccess ? "On" : "Off")", systemImage: "calendar")
@@ -171,12 +171,12 @@ struct CustomizeView: View {
                     .buttonStyle(.plain).help(store.notificationsOn ? "Notification settings" : "Enable notifications")
                     Spacer()
                 }
-                .font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
+                .font(.callout).foregroundStyle(Palette.inkSoft)
                 Button {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
                 } label: {
                     Label("Open App Settings", systemImage: "arrow.up.right").labelStyle(TrailingIcon())
-                        .font(.system(size: 12, weight: .medium)).padding(.horizontal, 10).padding(.vertical, 6)
+                        .font(.callout.weight(.medium)).padding(.horizontal, 10).padding(.vertical, 6)
                         .background(Palette.wash, in: RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain).frame(maxWidth: .infinity, alignment: .leading)
@@ -189,13 +189,13 @@ struct CustomizeView: View {
     var workspace: some View {
         Card(color: Palette.blue) {
             CardHeader(icon: "rectangle.3.group", title: "Customize workspace")
-            Text("Drag to reorder. Toggle to show or hide.").font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
+            Text("Drag to reorder. Toggle to show or hide.").font(.callout).foregroundStyle(Palette.inkSoft)
             List {
                 ForEach(store.settings.orderedCards) { kind in
                     let visible = !store.settings.hiddenCards.contains(kind)
                     HStack(spacing: 10) {
                         Image(systemName: kind.icon).frame(width: 18)
-                        Text(kind.title).font(.system(size: 13))
+                        Text(kind.title).font(.body)
                         Spacer()
                         Toggle("", isOn: Binding(get: { visible }, set: { on in
                             if on { store.settings.hiddenCards.remove(kind) } else { store.settings.hiddenCards.insert(kind) }
@@ -214,9 +214,9 @@ struct CustomizeView: View {
                 }
             }
             .listStyle(.plain).scrollContentBackground(.hidden).scrollDisabled(true).foregroundStyle(Palette.ink)
-            Text("Hidden cards keep their content.").font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
+            Text("Hidden cards keep their content.").font(.callout).foregroundStyle(Palette.inkSoft)
             Button("Reset layout") { withAnimation(.snappy) { store.settings.resetLayout() } }
-            .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
+            .buttonStyle(.plain).font(.callout).foregroundStyle(Palette.inkSoft)
         }
     }
 
@@ -224,7 +224,7 @@ struct CustomizeView: View {
 
     func row<Control: View>(_ label: String, @ViewBuilder control: () -> Control) -> some View {
         HStack {
-            Text(label).font(.system(size: 13))
+            Text(label).font(.body)
             Spacer()
             control()
         }
@@ -250,9 +250,9 @@ struct WorkspaceSettings: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Text("Workspace").font(.system(size: 22, weight: .bold))
+                Text("Workspace").font(.title.weight(.bold))
                 Text("How the notch looks when it opens. You can also drag the dots on a card to move it, drag the space between cards to resize them, and drag the bottom edge to change the height.")
-                    .font(.system(size: 13)).foregroundStyle(Palette.pInkSoft).fixedSize(horizontal: false, vertical: true)
+                    .font(.body).foregroundStyle(Palette.pInkSoft).fixedSize(horizontal: false, vertical: true)
 
                 // Preview at the real proportions
                 GeometryReader { geo in
@@ -261,7 +261,7 @@ struct WorkspaceSettings: View {
                     ZStack(alignment: .topLeading) {
                         ForEach(Array(cards.enumerated()), id: \.element) { i, kind in
                             RoundedRectangle(cornerRadius: 7, style: .continuous).fill(kind.color)
-                                .overlay(Image(systemName: kind.icon).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.ink))
+                                .overlay(Image(systemName: kind.icon).font(.body.weight(.semibold)).foregroundStyle(Palette.ink))
                                 .frame(width: frames[i].width).offset(x: frames[i].x)
                         }
                     }
@@ -272,14 +272,14 @@ struct WorkspaceSettings: View {
                 .animation(.snappy, value: store.settings)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("CARDS").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+                    Text("CARDS").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
                     List {
                         ForEach(store.settings.orderedCards) { kind in
                             let visible = !store.settings.hiddenCards.contains(kind)
                             HStack(spacing: 10) {
                                 Image(systemName: "line.3.horizontal").foregroundStyle(Palette.pInkSoft)
                                 Circle().fill(kind.color).frame(width: 10, height: 10)
-                                Text(kind.title).font(.system(size: 13))
+                                Text(kind.title).font(.body)
                                 Spacer()
                                 Toggle("", isOn: Binding(get: { visible }, set: { on in
                                     if on { store.settings.hiddenCards.remove(kind) } else { store.settings.hiddenCards.insert(kind) }
@@ -297,15 +297,15 @@ struct WorkspaceSettings: View {
                     }
                     .listStyle(.plain).scrollContentBackground(.hidden).scrollDisabled(true)
                     .frame(height: CGFloat(CardKind.allCases.count) * 34)
-                    Text("Drag to reorder. Hidden cards keep their content.").font(.system(size: 12)).foregroundStyle(Palette.pInkSoft)
+                    Text("Drag to reorder. Hidden cards keep their content.").font(.callout).foregroundStyle(Palette.pInkSoft)
                 }
                 .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("PANEL HEIGHT").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+                    Text("PANEL HEIGHT").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
                     HStack {
                         Slider(value: $store.settings.panelHeight, in: 240...700, step: 10)
-                        Text("\(Int(store.settings.panelHeight)) px").font(.system(size: 12).monospacedDigit()).frame(width: 52, alignment: .trailing)
+                        Text("\(Int(store.settings.panelHeight)) px").font(.callout.monospacedDigit()).frame(width: 52, alignment: .trailing)
                     }
                 }
                 .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))

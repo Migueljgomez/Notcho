@@ -133,7 +133,7 @@ struct HourLabels: View {
         VStack(spacing: 0) {
             ForEach(TimelineScale.firstHour...TimelineScale.lastHour, id: \.self) { h in
                 Text(Calendar.current.date(bySettingHour: h, minute: 0, second: 0, of: .now)!.formatted(.dateTime.hour()))
-                    .font(.system(size: 10)).foregroundStyle(Palette.pInkSoft)
+                    .font(.footnote).foregroundStyle(Palette.pInkSoft)
                     .frame(width: 36, height: TimelineScale.hourHeight, alignment: .topTrailing)
                     .id(h)
             }
@@ -205,7 +205,7 @@ struct DayColumn: View {
     /// Someone else's event: read-only.
     func other(_ e: EKEvent) -> some View {
         let (top, h) = frame(e)
-        return Text(e.title ?? "").font(.system(size: 11)).lineLimit(h > 30 ? 2 : 1)
+        return Text(e.title ?? "").font(.subheadline).lineLimit(h > 30 ? 2 : 1)
             .padding(.horizontal, 6).padding(.vertical, 3)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Color(cgColor: e.calendar.cgColor).opacity(0.18), in: RoundedRectangle(cornerRadius: 6))
@@ -220,10 +220,10 @@ struct DayColumn: View {
         let (top, h) = frame(e, extra: extra)
         let color = Palette.named(store.projects.first { $0.id == t.projectID }?.color ?? "lavender")
         return VStack(alignment: .leading, spacing: 1) {
-            Text(t.title).font(.system(size: 11, weight: .semibold)).strikethrough(t.done).lineLimit(h > 34 ? 2 : 1)
+            Text(t.title).font(.subheadline.weight(.semibold)).strikethrough(t.done).lineLimit(h > 34 ? 2 : 1)
             if h > 30 {
                 Text((e.startDate..<max(e.startDate, e.endDate.addingTimeInterval(Double(extra / hourHeight) * 3600))).formatted(date: .omitted, time: .shortened))
-                    .font(.system(size: 10).monospacedDigit()).opacity(0.8)
+                    .font(.footnote.monospacedDigit()).opacity(0.8)
             }
             Spacer(minLength: 0)
         }
@@ -260,7 +260,7 @@ struct ConnectCalendar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Drag tasks onto your day. Blocks go into a separate “Notch” calendar; your other calendars are only read.")
-                .font(.system(size: 12)).foregroundStyle(Palette.pInkSoft)
+                .font(.callout).foregroundStyle(Palette.pInkSoft)
             Button("Connect Calendar") { store.connectCalendar() }.buttonStyle(Pill(fill: Palette.pInk, text: Palette.card, size: 12))
         }
         .padding(14)
@@ -276,9 +276,9 @@ struct DayTimeline: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("Calendar").font(.system(size: 13, weight: .semibold))
+                Text("Calendar").font(.body.weight(.semibold))
                 Spacer()
-                Text(Date.now.formatted(.dateTime.weekday(.abbreviated).day())).font(.system(size: 12)).foregroundStyle(Palette.pInkSoft)
+                Text(Date.now.formatted(.dateTime.weekday(.abbreviated).day())).font(.callout).foregroundStyle(Palette.pInkSoft)
                 Button(action: collapse) { Image(systemName: "sidebar.trailing") }
                     .buttonStyle(.plain).foregroundStyle(Palette.pInkSoft).help("Hide the calendar")
             }
@@ -329,8 +329,8 @@ struct WeekCalendar: View {
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("To schedule").font(.system(size: 13, weight: .semibold)).padding(.top, 40)
-                Text("Drag onto a day.").font(.system(size: 11)).foregroundStyle(Palette.pInkSoft)
+                Text("To schedule").font(.body.weight(.semibold)).padding(.top, 40)
+                Text("Drag onto a day.").font(.subheadline).foregroundStyle(Palette.pInkSoft)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(toSchedule) { t in
@@ -338,14 +338,14 @@ struct WeekCalendar: View {
                                 if let p = store.projects.first(where: { $0.id == t.projectID }) {
                                     Circle().fill(Palette.named(p.color)).frame(width: 7, height: 7)
                                 }
-                                Text(t.title).font(.system(size: 12)).lineLimit(2)
+                                Text(t.title).font(.callout).lineLimit(2)
                                 Spacer(minLength: 0)
-                                if let m = t.timeLimit { Text(estimate(m)).font(.system(size: 10).monospacedDigit()).foregroundStyle(Palette.pInkSoft) }
+                                if let m = t.timeLimit { Text(estimate(m)).font(.footnote.monospacedDigit()).foregroundStyle(Palette.pInkSoft) }
                             }
                             .padding(8).background(Palette.card, in: RoundedRectangle(cornerRadius: 8))
                             .draggable(t.id.uuidString)
                         }
-                        if toSchedule.isEmpty { Text("Everything open is scheduled.").font(.system(size: 12)).foregroundStyle(Palette.pInkSoft) }
+                        if toSchedule.isEmpty { Text("Everything open is scheduled.").font(.callout).foregroundStyle(Palette.pInkSoft) }
                     }
                 }
             }
@@ -353,7 +353,7 @@ struct WeekCalendar: View {
             Divider()
             VStack(spacing: 0) {
                 HStack {
-                    Text(weekStart.formatted(.dateTime.month(.wide).year())).font(.system(size: 20, weight: .bold))
+                    Text(weekStart.formatted(.dateTime.month(.wide).year())).font(.title.weight(.bold))
                     Spacer()
                     Button { weekStart = Calendar.current.date(byAdding: .day, value: -7, to: weekStart)! } label: { Image(systemName: "chevron.left") }
                         .buttonStyle(Pill(fill: Palette.pWash))
@@ -370,8 +370,8 @@ struct WeekCalendar: View {
                         Spacer().frame(width: 40)
                         ForEach(days, id: \.self) { d in
                             VStack(spacing: 1) {
-                                Text(d.formatted(.dateTime.weekday(.abbreviated))).font(.system(size: 11)).foregroundStyle(Palette.pInkSoft)
-                                Text(d.formatted(.dateTime.day())).font(.system(size: 15, weight: Calendar.current.isDateInToday(d) ? .bold : .regular))
+                                Text(d.formatted(.dateTime.weekday(.abbreviated))).font(.subheadline).foregroundStyle(Palette.pInkSoft)
+                                Text(d.formatted(.dateTime.day())).font(.title3.weight(Calendar.current.isDateInToday(d) ? .bold : .regular))
                                     .foregroundStyle(Calendar.current.isDateInToday(d) ? Color.red : Palette.pInk)
                             }
                             .frame(maxWidth: .infinity)

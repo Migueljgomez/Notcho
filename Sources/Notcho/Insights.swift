@@ -103,16 +103,16 @@ struct InsightsView: View {
 
     func summary(_ s: InsightStats) -> some View {
         Card(color: Palette.sage) {
-            Text("Last 7 days").font(.system(size: 14, weight: .semibold))
+            Text("Last 7 days").font(.title3.weight(.semibold))
             Text("\(s.completed)").font(.system(size: 40, weight: .bold))
-            Text("Tasks completed").font(.system(size: 14, weight: .semibold))
+            Text("Tasks completed").font(.title3.weight(.semibold))
             GeometryReader { g in
                 Capsule().fill(.black.opacity(0.1)).overlay(alignment: .leading) {
                     Capsule().fill(Palette.ink).frame(width: s.planned == 0 ? 0 : g.size.width * CGFloat(s.completed) / CGFloat(max(s.planned, s.completed)))
                 }
             }
             .frame(height: 6)
-            Text("of \(s.planned) planned").font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
+            Text("of \(s.planned) planned").font(.callout).foregroundStyle(Palette.inkSoft)
             Rectangle().fill(.black.opacity(0.1)).frame(height: 1)
             VStack(spacing: 10) {
                 stat("timer", "Focus time", durationText(s.focusSeconds))
@@ -129,7 +129,7 @@ struct InsightsView: View {
             Spacer()
             Text(value).fontWeight(.semibold)
         }
-        .font(.system(size: 13))
+        .font(.body)
     }
 
     func chartCard(_ s: InsightStats) -> some View {
@@ -140,7 +140,7 @@ struct InsightsView: View {
                 HStack(spacing: 2) {
                     ForEach(["Tasks", "Focus", "Projects"].indices, id: \.self) { i in
                         Button { metric = i } label: {
-                            Text(["Tasks", "Focus", "Projects"][i]).font(.system(size: 12, weight: .semibold))
+                            Text(["Tasks", "Focus", "Projects"][i]).font(.callout.weight(.semibold))
                                 .foregroundStyle(metric == i ? .white : Palette.ink.opacity(0.7))
                                 .padding(.horizontal, 14).padding(.vertical, 5)
                                 .background(metric == i ? Color(red: 0.36, green: 0.34, blue: 0.5) : .clear, in: Capsule())
@@ -150,7 +150,7 @@ struct InsightsView: View {
                 }
                 .padding(3).background(.black.opacity(0.1), in: Capsule())
                 Spacer()
-                Text(headerText(s)).font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
+                Text(headerText(s)).font(.callout).foregroundStyle(Palette.inkSoft)
             }
 
             if metric == 2 { projectBars } else {
@@ -174,8 +174,8 @@ struct InsightsView: View {
                             .frame(maxWidth: .infinity)
                             .opacity(selected == nil || selected == d.date ? 1 : 0.45)
                         }
-                        Text(d.date.formatted(.dateTime.weekday(.abbreviated))).font(.system(size: 11))
-                        Text(d.date.formatted(.dateTime.day())).font(.system(size: 11)).foregroundStyle(Palette.inkSoft)
+                        Text(d.date.formatted(.dateTime.weekday(.abbreviated))).font(.subheadline)
+                        Text(d.date.formatted(.dateTime.day())).font(.subheadline).foregroundStyle(Palette.inkSoft)
                     }
                     .fontWeight(selected == d.date || Calendar.current.isDateInToday(d.date) ? .semibold : .regular)
                     .contentShape(Rectangle())
@@ -185,7 +185,7 @@ struct InsightsView: View {
                 VStack(alignment: .trailing) {
                     Text(axisLabel(top)); Spacer(); Text(axisLabel(top / 2)); Spacer(); Text("0")
                 }
-                .font(.system(size: 10)).foregroundStyle(Palette.inkSoft).padding(.bottom, 32).frame(width: 26)
+                .font(.footnote).foregroundStyle(Palette.inkSoft).padding(.bottom, 32).frame(width: 26)
             }
 
             HStack(spacing: 14) {
@@ -196,7 +196,7 @@ struct InsightsView: View {
                     Button("All week") { selected = nil }
                     Divider()
                     ForEach(s.days) { d in Button(d.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())) { selected = d.date } }
-                } label: { Text(selected == nil ? "Select a day" : selected!.formatted(.dateTime.weekday(.abbreviated).day())).font(.system(size: 12)) }
+                } label: { Text(selected == nil ? "Select a day" : selected!.formatted(.dateTime.weekday(.abbreviated).day())).font(.callout) }
                 .menuStyle(.borderlessButton).fixedSize()
             }
             }
@@ -211,19 +211,19 @@ struct InsightsView: View {
         return VStack(alignment: .leading, spacing: 9) {
             if rows.isEmpty {
                 Text("No focus time this week yet. Start the Focus timer on a task and it shows up here by project.")
-                    .font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
+                    .font(.callout).foregroundStyle(Palette.inkSoft)
             }
             ForEach(rows.prefix(6), id: \.0) { id, seconds in
                 let p = store.projects.first { $0.id == id }
                 HStack(spacing: 10) {
-                    Text(p?.name ?? "No project").font(.system(size: 12)).lineLimit(1).frame(width: 130, alignment: .leading)
+                    Text(p?.name ?? "No project").font(.callout).lineLimit(1).frame(width: 130, alignment: .leading)
                     GeometryReader { g in
                         RoundedRectangle(cornerRadius: 3).fill(p.map { Palette.named($0.color).opacity(1) } ?? Palette.ink.opacity(0.3))
                             .brightness(-0.08)
                             .frame(width: max(4, g.size.width * CGFloat(seconds / top)))
                     }
                     .frame(height: 12)
-                    Text(durationText(seconds)).font(.system(size: 12, weight: .semibold).monospacedDigit()).frame(width: 56, alignment: .trailing)
+                    Text(durationText(seconds)).font(.callout.weight(.semibold).monospacedDigit()).frame(width: 56, alignment: .trailing)
                 }
             }
             Spacer(minLength: 0)
@@ -234,7 +234,7 @@ struct InsightsView: View {
     func legend(_ color: Color, _ text: String) -> some View {
         HStack(spacing: 5) {
             RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 9, height: 9)
-            Text(text).font(.system(size: 12))
+            Text(text).font(.callout)
         }
     }
 
