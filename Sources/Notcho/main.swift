@@ -68,6 +68,11 @@ final class NotchController {
             }
         }
         model.applyLook()
+        // Increase Contrast swaps Tone colors; re-setting the appearance makes the panel resolve them again.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+                                                          object: nil, queue: .main) { [weak self] _ in
+            self?.panel.appearance = NSAppearance(named: .aqua); self?.panel.appearance = nil; self?.model.applyLook()
+        }
         panel.contentView = NSHostingView(rootView: RootView(model: model, store: store) { [weak self] in self?.closeButton() })
 
         let moves: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .leftMouseUp]

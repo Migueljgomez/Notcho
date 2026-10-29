@@ -41,17 +41,28 @@ enum Tone {
     static let notes = pair(0xF7E9AE, 0x1C1C1E)
     static let events = pair(0xE2D7F2, 0x1C1C1E)
     static let ink = pair(0x1C1C1E, 0xF5F5F7)
-    static let inkSoft = pair(0x55555A, 0x98989F)
+    // Secondary text and the tints below stay at 4.5:1 or better on every card color and on `wash`; Increase Contrast pushes them further.
+    static let inkSoft = pair(hex(0x4A4A4F), hex(0x98989F), contrast: (hex(0x2C2C2E), hex(0xD1D1D6)))
     /// A slightly darker version of whatever card color is underneath: highlights, fields, tiles.
-    static let wash = pair(NSColor.black.withAlphaComponent(0.09), NSColor.white.withAlphaComponent(0.08))
+    static let wash = pair(NSColor.black.withAlphaComponent(0.09), NSColor.white.withAlphaComponent(0.08),
+                           contrast: (NSColor.black.withAlphaComponent(0.15), NSColor.white.withAlphaComponent(0.16)))
+    /// Text and marks that mean something, dark enough to read on the pastels.
+    static let warning = pair(0x7F3D00, 0xFF9F0A)   // over a time limit
+    static let alert = pair(0x962018, 0xFF6961)     // overdue
+    static let now = pair(0x0846A0, 0x64A8FF)       // happening now
     static let raised = pair(NSColor.white.withAlphaComponent(0.55), NSColor.white.withAlphaComponent(0.14))
     static let button = pair(0x1C1C1E, 0xF2B33D)
     static let onButton = pair(0xFFFFFF, 0x1C1C1E)
     static let timer = pair(0x1C1C1E, 0xF2B33D)
 
     static func pair(_ light: Int, _ dark: Int) -> Color { pair(hex(light), hex(dark)) }
-    static func pair(_ light: NSColor, _ dark: NSColor) -> Color {
-        Color(nsColor: NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light })
+    /// `contrast` replaces the pair while Increase Contrast is on. The panel forces aqua/darkAqua, so the setting is read directly.
+    static func pair(_ light: NSColor, _ dark: NSColor, contrast: (NSColor, NSColor)? = nil) -> Color {
+        Color(nsColor: NSColor(name: nil) {
+            let isDark = $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            if let contrast, NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast { return isDark ? contrast.1 : contrast.0 }
+            return isDark ? dark : light
+        })
     }
     static func hex(_ v: Int) -> NSColor {
         NSColor(srgbRed: CGFloat(v >> 16 & 0xFF) / 255, green: CGFloat(v >> 8 & 0xFF) / 255, blue: CGFloat(v & 0xFF) / 255, alpha: 1)

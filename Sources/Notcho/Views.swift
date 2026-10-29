@@ -160,7 +160,7 @@ struct WorkspaceView: View {
                     Image(systemName: "xmark").font(.callout.weight(.bold)).foregroundStyle(.white)
                         .frame(width: 28, height: 28).background(.white.opacity(0.15), in: Circle())
                 }
-                .buttonStyle(.plain).help("Close")
+                .buttonStyle(.plain).help("Close").accessibilityLabel("Close")
             }
             .frame(height: 30)
 
@@ -317,6 +317,7 @@ struct Card<Content: View>: View {
                 }
             }
             .foregroundStyle(Tone.ink.opacity(grip == nil ? 0 : 0.16))
+            .accessibilityHidden(true)
             .frame(width: 70, height: 14).contentShape(Rectangle())
             .padding(.top, 6)
             .onHover { inside in
@@ -381,6 +382,7 @@ struct TasksCard: View {
     @State private var limitTaskID: UUID?
     @State private var reminderTaskID: UUID?
     @State private var hoverClock: UUID?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Card(color: Tone.tasks) {
@@ -471,7 +473,7 @@ struct TasksCard: View {
             let goal = store.isStopwatch ? TimeInterval(store.focusMinutes * 60) : store.focusTotal
             let done = timing && goal > 0 ? min(1, store.spent(at: ctx.date) / goal) : 0
             Image(systemName: "timer").font(.callout.weight(.semibold))
-                .symbolEffect(.pulse, isActive: timing && store.focusState == .running)
+                .symbolEffect(.pulse, isActive: timing && store.focusState == .running && !reduceMotion)
                 .frame(width: 24, height: 24)
                 .overlay {
                     if timing || hoverClock == task.id {
@@ -493,6 +495,7 @@ struct TasksCard: View {
                 Image(systemName: task.done ? "checkmark.circle.fill" : "circle").font(.title2)
             }
             .buttonStyle(.plain).help(task.done ? "Mark as incomplete" : "Mark as complete")
+            .accessibilityLabel(task.done ? "Mark \(task.title) as incomplete" : "Mark \(task.title) as complete")
 
             if field.wrappedValue == .rename(task.id) {
                 TextField("", text: $renameText).textFieldStyle(.plain).font(.body)
@@ -505,6 +508,7 @@ struct TasksCard: View {
                             .foregroundStyle(Tone.ink).fontWeight(isCurrent(task) ? .semibold : .regular)
                         if let p = store.projects.first(where: { $0.id == task.projectID }) {
                             Circle().fill(Palette.named(p.color)).brightness(-0.1).frame(width: 7, height: 7).help(p.name)
+                                .accessibilityLabel("Project: \(p.name)")
                         }
                     }
                     if !task.done && (task.timeLimit != nil || task.reminder != nil || task.due != nil) {
@@ -512,12 +516,12 @@ struct TasksCard: View {
                             if let limit = task.timeLimit {
                                 let actual = store.actualMinutes(task.id)
                                 Label(actual > 0 ? "\(actual)/\(limit)m" : "\(limit)m", systemImage: "timer")
-                                    .foregroundStyle(actual > limit ? Color.orange : Tone.inkSoft)
+                                    .foregroundStyle(actual > limit ? Tone.warning : Tone.inkSoft)
                             }
                             if let r = task.reminder { Label(reminderLabel(r), systemImage: "bell") }
                             if let due = task.due {
                                 Label(due < store.today ? "Overdue" : "Due " + due.formatted(.dateTime.month(.abbreviated).day()), systemImage: "flag")
-                                    .foregroundStyle(due < store.today ? Color.red.opacity(0.8) : Tone.inkSoft)
+                                    .foregroundStyle(due < store.today ? Tone.alert : Tone.inkSoft)
                             }
                         }
                         .font(.subheadline).foregroundStyle(Tone.inkSoft)
@@ -539,7 +543,7 @@ struct TasksCard: View {
             } else {
                 HStack(spacing: 8) {
                     Button { withAnimation(.easeOut(duration: 0.6)) { clockTapped(task) } } label: { focusIcon(task) }
-                        .help(clockHelp(task))
+                        .help(clockHelp(task)).accessibilityLabel("\(clockHelp(task)): \(task.title)")
                     Menu {
                         Button { store.start(task: task.id) } label: { Label("Focus", systemImage: "scope") }
                         Button { store.toggle(task.id) } label: { Label("Mark as Done", systemImage: "checkmark") }
@@ -558,7 +562,7 @@ struct TasksCard: View {
                         Button { PlannerWindow.shared.show(task: task.id) } label: { Label("Open in Planner", systemImage: "arrow.up.forward.app") }
                         Divider()
                         Button(role: .destructive) { store.delete(task.id) } label: { Label("Delete", systemImage: "trash") }
-                    } label: { Image(systemName: "ellipsis") }
+                    } label: { Image(systemName: "ellipsis").accessibilityLabel("More") }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 }
                 .buttonStyle(.plain).font(.subheadline.weight(.semibold)).foregroundStyle(Tone.ink)
@@ -674,13 +678,16 @@ struct CompleteButton: View {
             .contentShape(Circle())
         if hold {
             face.help("Hold to complete")
+                // VoiceOver can't press and hold, so it gets a plain action.
+                .accessibilityElement().accessibilityLabel("Complete focused task").accessibilityAddTraits(.isButton)
+                .accessibilityAction { action() }
                 .onLongPressGesture(minimumDuration: Self.holdTime) {
                     progress = 0; action()
                 } onPressingChanged: { pressing in
                     withAnimation(pressing ? .linear(duration: Self.holdTime) : .easeOut(duration: 0.15)) { progress = pressing ? 1 : 0 }
                 }
         } else {
-            Button(action: action) { face }.help("Complete focused task")
+            Button(action: action) { face }.help("Complete focused task").accessibilityLabel("Complete focused task")
         }
     }
 }
@@ -726,7 +733,7 @@ struct FocusCard: View {
                 if store.focusState != .ready {
                     Menu {
                         Button("End focus session") { store.endSession() }
-                    } label: { Image(systemName: "ellipsis") }
+                    } label: { Image(systemName: "ellipsis").accessibilityLabel("More") }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 }
             }
@@ -857,7 +864,7 @@ struct EventsCard: View {
                 Menu {
                     Button("Open in Calendar") { NSWorkspace.shared.open(URL(string: "ical://")!) }
                     Button("Refresh") { store.loadEvents() }
-                } label: { Image(systemName: "ellipsis") }
+                } label: { Image(systemName: "ellipsis").accessibilityLabel("More") }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
             }
             let reminders = store.reminders
@@ -920,7 +927,7 @@ struct EventsCard: View {
                 Menu {
                     Button("Mark as Done") { store.toggle(t.id) }
                     Button("Remove reminder", role: .destructive) { store.setReminder(t.id, at: nil) }
-                } label: { Image(systemName: "ellipsis") }
+                } label: { Image(systemName: "ellipsis").accessibilityLabel("More") }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
             }
         }
@@ -931,12 +938,12 @@ struct EventsCard: View {
         let live = !e.isAllDay && e.startDate <= now && now < e.endDate
         return tile {
             HStack(alignment: .top, spacing: 8) {
-                RoundedRectangle(cornerRadius: 2).fill(live ? Theme.now : Color(cgColor: e.calendar.cgColor)).frame(width: 3).frame(maxHeight: .infinity)
+                RoundedRectangle(cornerRadius: 2).fill(live ? Tone.now : Color(cgColor: e.calendar.cgColor)).frame(width: 3).frame(maxHeight: .infinity)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(e.title ?? "Untitled").font(.body.weight(.semibold)).lineLimit(2)
                     Text(e.isAllDay ? "All day" : "\(e.startDate.formatted(date: .omitted, time: .shortened)) – \(e.endDate.formatted(date: .omitted, time: .shortened))")
                         .font(.subheadline).foregroundStyle(Tone.inkSoft)
-                    if live { Text("Happening now").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.now) }
+                    if live { Text("Happening now").font(.subheadline.weight(.semibold)).foregroundStyle(Tone.now) }
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
