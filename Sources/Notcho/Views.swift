@@ -349,8 +349,13 @@ struct CardHeader: View {
     let icon: String?, title: String
     var body: some View {
         HStack(spacing: 6) {
-            // fixed icon width: every card's title starts at the same spot, tight to its icon
-            if let icon { Image(systemName: icon).font(.title3.weight(.semibold)).frame(width: 18) }
+            // Icons start on the card's 16 pt text line in a fixed 16 pt column, so every title starts at 38 pt.
+            // square.and.pencil's pencil makes it draw 1 pt low and right of the others (measured): nudge it back.
+            if let icon {
+                Image(systemName: icon).font(.title3.weight(.semibold))
+                    .offset(x: icon == "square.and.pencil" ? -1 : 0, y: icon == "square.and.pencil" ? -1 : 0)
+                    .frame(width: 16, alignment: .leading)
+            }
             Text(title).font(.title2.weight(.semibold))
         }
     }
@@ -446,6 +451,25 @@ struct TasksCard: View {
         !task.done && (store.focusTaskID ?? store.todo.first?.id) == task.id
     }
 
+    /// The Focus card's timer icon. On the task being timed, a ring fills with the session's progress and the icon pulses while it runs.
+    func focusIcon(_ task: TaskItem) -> some View {
+        let timing = store.focusTaskID == task.id && store.focusState != .ready
+        return TimelineView(.periodic(from: .now, by: 1)) { ctx in
+            let goal = store.isStopwatch ? TimeInterval(store.focusMinutes * 60) : store.focusTotal
+            let done = timing && goal > 0 ? min(1, store.spent(at: ctx.date) / goal) : 0
+            Image(systemName: "timer").font(.callout.weight(.semibold))
+                .symbolEffect(.pulse, isActive: timing && store.focusState == .running)
+                .frame(width: 24, height: 24)
+                .overlay {
+                    if timing {
+                        Circle().stroke(Tone.ink.opacity(0.15), lineWidth: 2)
+                        Circle().trim(from: 0, to: done).stroke(Tone.ink, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                    }
+                }
+        }
+    }
+
     func row(_ task: TaskItem) -> some View {
         HStack(alignment: .center, spacing: 10) {
             Button { withAnimation(.spring(response: 0.3, dampingFraction: 1)) { store.toggle(task.id) } } label: {
@@ -497,8 +521,8 @@ struct TasksCard: View {
                     .buttonStyle(.plain).font(.subheadline).foregroundStyle(Tone.inkSoft).help("Delete")
             } else {
                 HStack(spacing: 8) {
-                    Button { store.start(task: task.id) } label: { Image(systemName: "play.fill") }
-                        .help("Start focusing on this task")
+                    Button { withAnimation(.easeOut(duration: 0.6)) { store.start(task: task.id) } } label: { focusIcon(task) }
+                        .help("Focus on this task")
                     Menu {
                         Button { store.start(task: task.id) } label: { Label("Focus", systemImage: "scope") }
                         Button { store.toggle(task.id) } label: { Label("Mark as Done", systemImage: "checkmark") }
