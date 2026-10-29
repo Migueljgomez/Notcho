@@ -54,6 +54,8 @@ struct Settings: Codable, Equatable {
     var plannerDark = false     // Planner window in dark mode (the notch is unaffected)
     var cardWeights: [CardKind: Double] = [:]  // resized card widths; missing = the card's default
     var panelHeight = Double(Metrics.panelHeight)
+    var closeAfter = 0.0        // seconds the notch waits after the pointer leaves; `stayOpen` = only click-away, Esc or ✕
+    static let stayOpen = 3.5
 
     init() {}
 
@@ -75,6 +77,7 @@ struct Settings: Codable, Equatable {
         plannerDark = (try? c.decodeIfPresent(Bool.self, forKey: .plannerDark)) ?? d.plannerDark
         cardWeights = (try? c.decodeIfPresent([CardKind: Double].self, forKey: .cardWeights)) ?? d.cardWeights
         panelHeight = (try? c.decodeIfPresent(Double.self, forKey: .panelHeight)) ?? d.panelHeight
+        closeAfter = (try? c.decodeIfPresent(Double.self, forKey: .closeAfter)) ?? d.closeAfter
     }
 
     /// Saved order plus any card kinds added since it was saved.

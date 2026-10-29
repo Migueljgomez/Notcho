@@ -196,12 +196,13 @@ final class NotchController {
         if inside {
             pinned = false // the pointer is here now, so normal hover rules take over
             if !model.expanded { setExpanded(true) }
-        } else if pinned {
+        } else if pinned || store.settings.closeAfter >= Settings.stayOpen {
             return
         } else if model.expanded && !model.editing && !model.dragging && !menuOpen && panel.childWindows?.isEmpty != false {
             // menus and popovers (child windows) keep it open
             collapseTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(60)) // just enough to ignore edge jitter
+                // at least 60 ms, to ignore edge jitter; longer if the person chose a slower close
+                try? await Task.sleep(for: .milliseconds(max(60, Int((self?.store.settings.closeAfter ?? 0) * 1000))))
                 guard !Task.isCancelled else { return }
                 self?.setExpanded(false)
             }

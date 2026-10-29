@@ -35,6 +35,11 @@ struct CustomizeView: View {
                     .labelsHidden().fixedSize()
                     .onChange(of: store.settings.shortcut) { HotKey.register(store.settings.shortcut) }
                 }
+                row("Close after") {
+                    Slider(value: $store.settings.closeAfter, in: 0...Settings.stayOpen, step: 0.25).frame(width: 110)
+                    Text(closeLabel).font(.callout.monospacedDigit()).frame(width: 64, alignment: .trailing)
+                }
+                .help("How long the notch stays open after your pointer leaves it")
                 Dotted()
                 Text("Your day").font(.body.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
                 row("Day starts at") {
@@ -228,6 +233,11 @@ struct CustomizeView: View {
             Spacer()
             control()
         }
+    }
+
+    var closeLabel: String {
+        let s = store.settings.closeAfter
+        return s >= Settings.stayOpen ? "Stay open" : s == 0 ? "Instant" : String(format: "%g s", s)
     }
 
     func hourLabel(_ h: Int) -> String {
