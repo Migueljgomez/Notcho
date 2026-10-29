@@ -80,7 +80,7 @@ extension Palette {
 }
 
 enum PlannerSection: Hashable {
-    case today, upcoming, someday, done, goals, notes, calendar, project(UUID)
+    case today, upcoming, someday, done, goals, notes, calendar, workspace, project(UUID)
 }
 
 // MARK: - Root: sidebar | list | detail
@@ -104,6 +104,8 @@ struct PlannerView: View {
                 GoalsView(store: store).frame(maxWidth: .infinity)
             } else if section == .calendar {
                 WeekCalendar(store: store).frame(maxWidth: .infinity)
+            } else if section == .workspace {
+                WorkspaceSettings(store: store).frame(maxWidth: .infinity)
             } else {
                 PlannerList(store: store, section: section, selected: $selected)
                     .frame(minWidth: 320, maxWidth: .infinity)
@@ -119,7 +121,7 @@ struct PlannerView: View {
                     }
                 }
             }
-            if section != .notes, section != .goals, section != .calendar, let id = selected, store.tasks.contains(where: { $0.id == id }) {
+            if section != .notes, section != .goals, section != .calendar, section != .workspace, let id = selected, store.tasks.contains(where: { $0.id == id }) {
                 Divider()
                 TaskDetail(store: store, id: id, close: { selected = nil })
                     .id(id) // fresh local edit state per task
@@ -233,6 +235,7 @@ struct PlannerSidebar: View {
                 }
             }
             Spacer(minLength: 0)
+            row(.workspace, "Workspace", "rectangle.3.group", Palette.pInkSoft, nil)
             Button {
                 store.settings.plannerDark.toggle()
                 PlannerWindow.shared.applyAppearance()
@@ -272,7 +275,7 @@ struct PlannerSidebar: View {
         case .upcoming: store.schedule(id, day: Calendar.current.date(byAdding: .day, value: 1, to: store.today))
         case .someday: store.schedule(id, day: nil, someday: true)
         case .done: if store.tasks.first(where: { $0.id == id })?.done == false { store.toggle(id) }
-        case .notes, .goals, .calendar: break
+        case .notes, .goals, .calendar, .workspace: break
         case .project(let p): store.update(id) { $0.projectID = p }
         }
     }
@@ -294,6 +297,7 @@ struct PlannerList: View {
         case .someday: "Someday"
         case .done: "Done"
         case .notes: "Notes"
+        case .workspace: "Workspace"
         case .goals: "Goals"
         case .calendar: "Calendar"
         case .project(let id): store.projects.first { $0.id == id }?.name ?? "Project"
@@ -313,7 +317,7 @@ struct PlannerList: View {
             return [(nil, store.someday)]
         case .done:
             return byDay(store.doneRecent) { Calendar.current.startOfDay(for: $0.completedAt!) }
-        case .notes, .goals, .calendar: return []
+        case .notes, .goals, .calendar, .workspace: return []
         case .project(let id):
             let all = store.tasks(in: id)
             let done = all.filter(\.done)

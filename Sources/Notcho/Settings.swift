@@ -11,6 +11,16 @@ enum CardKind: String, Codable, CaseIterable, Identifiable {
     var weight: CGFloat { [0.36, 0.19, 0.2, 0.25][Self.allCases.firstIndex(of: self)!] }
 }
 
+/// Where each visible card sits in a row `width` wide.
+func cardFrames(_ weights: [CGFloat], width: CGFloat, gap: CGFloat) -> [(x: CGFloat, width: CGFloat)] {
+    let total = weights.reduce(0, +), room = width - gap * CGFloat(max(weights.count - 1, 0))
+    var x: CGFloat = 0
+    return weights.map { w in
+        defer { x += room * w / total + gap }
+        return (x, room * w / total)
+    }
+}
+
 enum Unfinished: String, Codable, CaseIterable { case ask = "Ask me", carry = "Move to today", leave = "Leave in history" }
 
 enum Shortcut: String, Codable, CaseIterable {
@@ -42,6 +52,8 @@ struct Settings: Codable, Equatable {
     var breakAfterMinutes = 90  // break nudge after this much unbroken focus; 0 = off
     var wrapUpHour = 17         // daily wrap-up banner at this hour; 0 = off
     var plannerDark = false     // Planner window in dark mode (the notch is unaffected)
+    var cardWeights: [CardKind: Double] = [:]  // resized card widths; missing = the card's default
+    var panelHeight = Double(Metrics.panelHeight)
 
     init() {}
 
@@ -61,11 +73,31 @@ struct Settings: Codable, Equatable {
         breakAfterMinutes = (try? c.decodeIfPresent(Int.self, forKey: .breakAfterMinutes)) ?? d.breakAfterMinutes
         wrapUpHour = (try? c.decodeIfPresent(Int.self, forKey: .wrapUpHour)) ?? d.wrapUpHour
         plannerDark = (try? c.decodeIfPresent(Bool.self, forKey: .plannerDark)) ?? d.plannerDark
+        cardWeights = (try? c.decodeIfPresent([CardKind: Double].self, forKey: .cardWeights)) ?? d.cardWeights
+        panelHeight = (try? c.decodeIfPresent(Double.self, forKey: .panelHeight)) ?? d.panelHeight
     }
 
     /// Saved order plus any card kinds added since it was saved.
     var orderedCards: [CardKind] { cardOrder + CardKind.allCases.filter { !cardOrder.contains($0) } }
     var visibleCards: [CardKind] { orderedCards.filter { !hiddenCards.contains($0) } }
+
+    func weight(_ card: CardKind) -> CGFloat { cardWeights[card].map { CGFloat($0) } ?? card.weight }
+
+    /// Card order, visibility, widths and panel height back to the defaults.
+    mutating func resetLayout() {
+        let d = Settings()
+        cardOrder = d.cardOrder; hiddenCards = d.hiddenCards; cardWeights = d.cardWeights; panelHeight = d.panelHeight
+    }
+
+    /// Dragging the gap between `left` and `right` by `dx` points (`perPoint` = weight per point); both keep `minWidth`.
+    mutating func resize(_ left: CardKind, _ right: CardKind, from start: (CGFloat, CGFloat), by dx: CGFloat,
+                         perPoint: CGFloat, minWidth: CGFloat) {
+        let (l, r) = (start.0 / perPoint, start.1 / perPoint) // widths in points
+        let newL = min(max(l + dx, minWidth), l + r - minWidth)
+        guard newL.isFinite, l + r >= 2 * minWidth else { return }
+        cardWeights[left] = Double(newL * perPoint)
+        cardWeights[right] = Double((l + r - newL) * perPoint)
+    }
 
     /// Dropping `card` onto `target` takes the target's place (moving right lands after it, left before it).
     mutating func move(_ card: CardKind, onto target: CardKind) {

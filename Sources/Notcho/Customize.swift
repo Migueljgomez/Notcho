@@ -215,10 +215,7 @@ struct CustomizeView: View {
             }
             .listStyle(.plain).scrollContentBackground(.hidden).scrollDisabled(true).foregroundStyle(Palette.ink)
             Text("Hidden cards keep their content.").font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
-            Button("Reset to default") {
-                store.settings.cardOrder = CardKind.allCases
-                store.settings.hiddenCards = []
-            }
+            Button("Reset layout") { withAnimation(.snappy) { store.settings.resetLayout() } }
             .buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
         }
     }
@@ -242,5 +239,86 @@ struct CustomizeView: View {
 struct TrailingIcon: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 4) { configuration.title; configuration.icon }
+    }
+}
+
+// MARK: - Planner → Workspace: the notch layout, with a live preview
+
+struct WorkspaceSettings: View {
+    @Bindable var store: Store
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Workspace").font(.system(size: 22, weight: .bold))
+                Text("How the notch looks when it opens. You can also drag the dots on a card to move it, drag the space between cards to resize them, and drag the bottom edge to change the height.")
+                    .font(.system(size: 13)).foregroundStyle(Palette.pInkSoft).fixedSize(horizontal: false, vertical: true)
+
+                // Preview at the real proportions
+                GeometryReader { geo in
+                    let cards = store.settings.visibleCards
+                    let frames = cardFrames(cards.map(store.settings.weight), width: geo.size.width - 16, gap: 5)
+                    ZStack(alignment: .topLeading) {
+                        ForEach(Array(cards.enumerated()), id: \.element) { i, kind in
+                            RoundedRectangle(cornerRadius: 7, style: .continuous).fill(kind.color)
+                                .overlay(Image(systemName: kind.icon).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.ink))
+                                .frame(width: frames[i].width).offset(x: frames[i].x)
+                        }
+                    }
+                    .padding(8)
+                    .background(.black, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .frame(height: min(store.settings.panelHeight / 4, 150))
+                .animation(.snappy, value: store.settings)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("CARDS").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+                    List {
+                        ForEach(store.settings.orderedCards) { kind in
+                            let visible = !store.settings.hiddenCards.contains(kind)
+                            HStack(spacing: 10) {
+                                Image(systemName: "line.3.horizontal").foregroundStyle(Palette.pInkSoft)
+                                Circle().fill(kind.color).frame(width: 10, height: 10)
+                                Text(kind.title).font(.system(size: 13))
+                                Spacer()
+                                Toggle("", isOn: Binding(get: { visible }, set: { on in
+                                    if on { store.settings.hiddenCards.remove(kind) } else { store.settings.hiddenCards.insert(kind) }
+                                }))
+                                .toggleStyle(.switch).labelsHidden().controlSize(.small)
+                                .disabled(visible && store.settings.visibleCards.count == 1) // keep at least one card
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .onMove { from, to in
+                            var order = store.settings.orderedCards
+                            order.move(fromOffsets: from, toOffset: to)
+                            store.settings.cardOrder = order
+                        }
+                    }
+                    .listStyle(.plain).scrollContentBackground(.hidden).scrollDisabled(true)
+                    .frame(height: CGFloat(CardKind.allCases.count) * 34)
+                    Text("Drag to reorder. Hidden cards keep their content.").font(.system(size: 12)).foregroundStyle(Palette.pInkSoft)
+                }
+                .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("PANEL HEIGHT").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.pInkSoft)
+                    HStack {
+                        Slider(value: $store.settings.panelHeight, in: 240...700, step: 10)
+                        Text("\(Int(store.settings.panelHeight)) px").font(.system(size: 12).monospacedDigit()).frame(width: 52, alignment: .trailing)
+                    }
+                }
+                .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))
+
+                Button { withAnimation(.snappy) { store.settings.resetLayout() } } label: {
+                    Label("Reset layout", systemImage: "arrow.counterclockwise")
+                }
+                .buttonStyle(Pill(fill: Palette.pWash))
+                .help("Card order, widths, visibility and height back to the default")
+            }
+            .padding(.horizontal, 28).padding(.top, 40).padding(.bottom, 28)
+            .frame(maxWidth: 640, alignment: .leading)
+        }
+        .foregroundStyle(Palette.pInk)
     }
 }

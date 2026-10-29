@@ -9,6 +9,8 @@ enum Page: String, CaseIterable { case workspace = "Workspace", insights = "Insi
 @Observable final class NotchModel {
     var expanded = false
     var editing = false            // a text field has focus: don't collapse on hover-out
+    var dragging = false           // moving or resizing a card, or the panel: don't collapse
+    var setHeight: (CGFloat) -> Void = { _ in }  // the controller resizes the panel window
     var page = Page.workspace
     var collapsed = CGSize(width: 200, height: 32)
     var workspace = CGSize(width: 820, height: 330)
@@ -163,28 +165,104 @@ struct WorkspaceView: View {
             switch model.page {
             case .workspace:
                 GeometryReader { geo in
-                    let cards = store.settings.visibleCards
-                    let w = geo.size.width - CGFloat(cards.count - 1) * Metrics.cardGap
-                    let total = cards.reduce(0) { $0 + $1.weight }
-                    HStack(spacing: Metrics.cardGap) {
-                        ForEach(cards) { kind in
+                    let cards = store.settings.visibleCards, weights = cards.map(store.settings.weight)
+                    let frames = cardFrames(weights, width: geo.size.width, gap: Metrics.cardGap)
+                    let perPoint = weights.reduce(0, +) / (geo.size.width - Metrics.cardGap * CGFloat(cards.count - 1))
+                    ZStack(alignment: .topLeading) {
+                        ForEach(Array(cards.enumerated()), id: \.element) { i, kind in
+                            let lifted = moving == kind
                             card(kind)
-                                .frame(width: w * kind.weight / total)
-                                .dropDestination(for: String.self) { items, _ in
-                                    guard let raw = items.first, let dragged = CardKind(rawValue: raw) else { return false }
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 1)) { store.settings.move(dragged, onto: kind) }
-                                    return true
-                                }
+                                .frame(width: frames[i].width, height: geo.size.height)
+                                .scaleEffect(lifted ? 1.02 : 1)
+                                .shadow(color: .black.opacity(lifted ? 0.4 : 0), radius: 14, y: 6)
+                                .offset(x: frames[i].x + (lifted ? moveOffset : 0))
+                                .zIndex(lifted ? 1 : 0)
+                                .transaction { if lifted { $0.animation = nil } } // the lifted card follows the pointer exactly
+                                .environment(\.cardGrip) { grip(kind, $0, cards: cards, frames: frames) }
+                        }
+                        ForEach(cards.indices.dropLast(), id: \.self) { i in
+                            gap(cards[i], cards[i + 1], height: geo.size.height, perPoint: perPoint)
+                                .offset(x: frames[i].x + frames[i].width)
                         }
                     }
+                    .coordinateSpace(name: "cards")
                 }
             case .insights: InsightsView(store: store)
             case .customize: CustomizeView(store: store)
             }
         }
         .padding(.horizontal, Metrics.outer).padding(.top, 6).padding(.bottom, Metrics.outer)
+        .overlay(alignment: .bottom) { if model.page == .workspace { heightHandle } }
         .onChange(of: field) { model.editing = field != nil }
         .onChange(of: model.expanded) { if !model.expanded { field = nil } }
+    }
+
+    // MARK: Moving and resizing
+
+    @State private var moving: CardKind?
+    @State private var grabX: CGFloat = 0       // pointer → lifted card's left edge
+    @State private var moveOffset: CGFloat = 0
+    @State private var resizeStart: (CGFloat, CGFloat)?
+    @State private var hoverGap: CardKind?
+    @State private var heightStart: CGFloat?
+
+    /// Dot handle dragged: the card follows the pointer and swaps with a neighbor once it passes that neighbor's middle.
+    func grip(_ kind: CardKind, _ v: DragGesture.Value?, cards: [CardKind], frames: [(x: CGFloat, width: CGFloat)]) {
+        guard let v, let i = cards.firstIndex(of: kind) else {
+            model.dragging = false
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { moving = nil; moveOffset = 0 }
+            return
+        }
+        if moving != kind { moving = kind; grabX = v.startLocation.x - frames[i].x; model.dragging = true }
+        let left = v.location.x - grabX, middle = left + frames[i].width / 2
+        var newX = frames[i].x, target: CardKind?
+        if i + 1 < cards.count, middle > frames[i + 1].x + frames[i + 1].width / 2 {
+            target = cards[i + 1]; newX = frames[i].x + frames[i + 1].width + Metrics.cardGap
+        } else if i > 0, middle < frames[i - 1].x + frames[i - 1].width / 2 {
+            target = cards[i - 1]; newX = frames[i - 1].x
+        }
+        withAnimation(.spring(response: 0.3, dampingFraction: 1)) {
+            if let target { store.settings.move(kind, onto: target) }
+            moveOffset = left - newX
+        }
+    }
+
+    /// The space between two cards: drag to resize them, double-click to make them equal.
+    func gap(_ l: CardKind, _ r: CardKind, height: CGFloat, perPoint: CGFloat) -> some View {
+        Color.clear.frame(width: Metrics.cardGap, height: height).contentShape(Rectangle())
+            .overlay { Capsule().fill(.white.opacity(hoverGap == l ? 0.4 : 0)).frame(width: 3, height: 40) }
+            .onHover { inside in
+                hoverGap = inside ? l : (hoverGap == l ? nil : hoverGap)
+                if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+            }
+            .onTapGesture(count: 2) {
+                let even = Double(store.settings.weight(l) + store.settings.weight(r)) / 2
+                withAnimation(.spring(response: 0.3, dampingFraction: 1)) {
+                    store.settings.cardWeights[l] = even; store.settings.cardWeights[r] = even
+                }
+            }
+            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("cards"))
+                .onChanged { v in
+                    if resizeStart == nil { resizeStart = (store.settings.weight(l), store.settings.weight(r)); model.dragging = true }
+                    store.settings.resize(l, r, from: resizeStart!, by: v.translation.width, perPoint: perPoint, minWidth: 140)
+                }
+                .onEnded { _ in resizeStart = nil; model.dragging = false })
+            .help("Drag to resize · double-click to make them equal")
+    }
+
+    /// Bottom edge: drag to make the panel taller or shorter, double-click for the default height.
+    var heightHandle: some View {
+        Capsule().fill(.white.opacity(heightStart != nil ? 0.5 : 0.2)).frame(width: 40, height: 4)
+            .frame(width: 160, height: 14).contentShape(Rectangle())
+            .onHover { if $0 { NSCursor.resizeUpDown.push() } else { NSCursor.pop() } }
+            .onTapGesture(count: 2) { model.setHeight(Metrics.panelHeight) }
+            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .onChanged { v in
+                    if heightStart == nil { heightStart = CGFloat(store.settings.panelHeight); model.dragging = true }
+                    model.setHeight(heightStart! + v.translation.height)
+                }
+                .onEnded { _ in heightStart = nil; model.dragging = false })
+            .help("Drag to change the height · double-click to reset")
     }
 
     @ViewBuilder func card(_ kind: CardKind) -> some View {
@@ -215,21 +293,37 @@ struct PagePicker: View {
     }
 }
 
+/// A Workspace card's dot handle reports drags here: a value while dragging, nil when let go.
+struct CardGripKey: EnvironmentKey { static let defaultValue: ((DragGesture.Value?) -> Void)? = nil }
+extension EnvironmentValues {
+    var cardGrip: ((DragGesture.Value?) -> Void)? { get { self[CardGripKey.self] } set { self[CardGripKey.self] = newValue } }
+}
+
+extension CardKind {
+    var color: Color { [Palette.sage, Palette.lavender, Palette.olive, Palette.blue][Self.allCases.firstIndex(of: self)!] }
+}
+
 struct Card<Content: View>: View {
     let color: Color
-    var drag: CardKind? = nil   // set on Workspace cards: the top handle drags the card
     @ViewBuilder let content: Content
+    @Environment(\.cardGrip) private var grip
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Capsule().fill(.black.opacity(0.15)).frame(width: 30, height: 4)
-                .frame(width: 70, height: 14).contentShape(Rectangle())
-                .draggable(drag?.rawValue ?? "") {
-                    Text(drag?.title ?? "").font(.system(size: 13, weight: .semibold)).padding(8)
-                        .background(color, in: RoundedRectangle(cornerRadius: 8))
+            Grid(horizontalSpacing: 3, verticalSpacing: 3) {
+                ForEach(0..<2, id: \.self) { _ in
+                    GridRow { ForEach(0..<3, id: \.self) { _ in Circle().frame(width: 3.5, height: 3.5) } }
                 }
-                .disabled(drag == nil)
-                .help(drag == nil ? "" : "Drag to move this card")
-                .frame(maxWidth: .infinity)
+            }
+            .foregroundStyle(.black.opacity(grip == nil ? 0 : 0.28))
+            .frame(width: 70, height: 14).contentShape(Rectangle())
+            .onHover { inside in
+                guard grip != nil else { return }
+                if inside { NSCursor.openHand.push() } else { NSCursor.pop() }
+            }
+            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("cards"))
+                .onChanged { grip?($0) }.onEnded { _ in grip?(nil) }, including: grip == nil ? .none : .all)
+            .help(grip == nil ? "" : "Drag to move this card")
+            .frame(maxWidth: .infinity)
             VStack(alignment: .leading, spacing: Metrics.stack) { content }
                 .padding(.horizontal, Metrics.cardPadding).padding(.bottom, Metrics.cardPadding).padding(.top, 2)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -280,7 +374,7 @@ struct TasksCard: View {
     @State private var reminderTaskID: UUID?
 
     var body: some View {
-        Card(color: Palette.sage, drag: .tasks) {
+        Card(color: Palette.sage) {
             HStack {
                 CardHeader(icon: nil, title: "Today's tasks")
                 Spacer()
@@ -516,7 +610,7 @@ struct FocusCard: View {
     @State private var showSetTime = false
 
     var body: some View {
-        Card(color: Palette.lavender, drag: .focus) {
+        Card(color: Palette.lavender) {
             TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
                 VStack(spacing: 8) {
                     DotMatrix(text: clock(store.display(at: ctx.date)), dot: 3.6).padding(.top, Metrics.stack)
@@ -635,7 +729,7 @@ struct NotepadCard: View {
     var field: FocusState<Field?>.Binding
 
     var body: some View {
-        Card(color: Palette.olive, drag: .notepad) {
+        Card(color: Palette.olive) {
             CardHeader(icon: "square.and.pencil", title: "Notepad")
             Text(Date.now.formatted(.dateTime.month(.abbreviated).day().year()))
                 .font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
@@ -685,7 +779,7 @@ struct EventsCard: View {
     let store: Store
 
     var body: some View {
-        Card(color: Palette.blue, drag: .events) {
+        Card(color: Palette.blue) {
             HStack {
                 CardHeader(icon: "calendar", title: "Events")
                 Spacer()

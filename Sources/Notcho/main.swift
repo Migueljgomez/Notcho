@@ -43,6 +43,7 @@ final class NotchController {
     var suppressUntilExit = false  // after ✕, don't reopen until the pointer leaves
     var menuOpen = false
     var pinned = false             // opened by the shortcut: stays open until click-outside, Esc, ✕ or hover-out
+    var appliedHeight = 0.0        // the settings height the window was last sized for
 
     init() {
         panel.isOpaque = false
@@ -53,6 +54,11 @@ final class NotchController {
         panel.hidesOnDeactivate = false
         panel.isMovable = false
         panel.acceptsMouseMovedEvents = true
+        model.setHeight = { [weak self] h in
+            guard let self, let screen = panel.screen ?? NSScreen.main else { return }
+            store.settings.panelHeight = Double(min(max(h, 240), screen.frame.height - 120))
+            layout()
+        }
         panel.contentView = NSHostingView(rootView: RootView(model: model, store: store) { [weak self] in self?.closeButton() })
 
         let moves: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .leftMouseUp]
@@ -158,7 +164,8 @@ final class NotchController {
         notch = NotchLayout.notchRect(screen: screen.frame, left: screen.auxiliaryTopLeftArea,
                                       right: screen.auxiliaryTopRightArea, menuBarHeight: menuBar)
             ?? CGRect(x: screen.frame.midX - 100, y: screen.frame.maxY - 24, width: 200, height: 24)
-        workspace = NotchLayout.workspaceFrame(screen: screen.frame)
+        appliedHeight = store.settings.panelHeight
+        workspace = NotchLayout.workspaceFrame(screen: screen.frame, height: CGFloat(appliedHeight))
         pill = NotchLayout.pillFrame(notch: notch)
         model.collapsed = notch.size
         model.workspace = workspace.size
@@ -179,7 +186,7 @@ final class NotchController {
     func trackPointer() {
         let p = NSEvent.mouseLocation
         let inside = surfaces.contains { $0.contains(p) }
-        panel.ignoresMouseEvents = !inside  // clicks outside the shape fall through to apps below
+        panel.ignoresMouseEvents = !inside && !model.dragging  // clicks outside the shape fall through to apps below
         if !inside { suppressUntilExit = false }
         setHover(inside && !suppressUntilExit)
     }
@@ -191,7 +198,7 @@ final class NotchController {
             if !model.expanded { setExpanded(true) }
         } else if pinned {
             return
-        } else if model.expanded && !model.editing && !menuOpen && panel.childWindows?.isEmpty != false {
+        } else if model.expanded && !model.editing && !model.dragging && !menuOpen && panel.childWindows?.isEmpty != false {
             // menus and popovers (child windows) keep it open
             collapseTask = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(60)) // just enough to ignore edge jitter
@@ -214,6 +221,7 @@ final class NotchController {
     }
 
     func setExpanded(_ value: Bool) {
+        if value && store.settings.panelHeight != appliedHeight { layout() } // height changed in the Planner
         if !value { panel.makeFirstResponder(nil); model.editing = false; pinned = false }
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         let anim: Animation? = reduceMotion ? nil : .spring(response: value ? 0.38 : 0.3, dampingFraction: 1.0)
@@ -410,6 +418,14 @@ if CommandLine.arguments.contains("--selftest") {
     precondition(SyncFields(task: st5).dayKey == nil && SyncFields(task: st5).alarm == noon)
     precondition(SyncFields(task: st5).fingerprint != SyncFields(task: TaskItem(title: "Ship it")).fingerprint)
     precondition(date(fromDayKey: isoDay(of: noon, calendar: cal), calendar: cal) == cal.startOfDay(for: noon))
+    // Workspace layout: frames fill the row; resizing keeps both cards above the minimum
+    let fr = cardFrames([1, 1, 2], width: 424, gap: 12)
+    precondition(fr[0] == (0, 100) && fr[1] == (112, 100) && fr[2] == (224, 200))
+    var lay = Settings()
+    lay.resize(.tasks, .focus, from: (0.36, 0.19), by: 1000, perPoint: 0.001, minWidth: 140)
+    precondition(abs(lay.weight(.focus) - 0.14) < 1e-9 && abs(lay.weight(.tasks) - 0.41) < 1e-9)
+    lay.panelHeight = 500; lay.resetLayout()
+    precondition(lay.cardWeights.isEmpty && lay.panelHeight == Double(Metrics.panelHeight))
     print("selftest ok")
     exit(0)
 }
