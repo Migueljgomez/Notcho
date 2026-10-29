@@ -32,3 +32,28 @@ enum Theme {
         })
     }
 }
+
+/// Notch colors: pastel under a Light appearance, the dark island under Dark. The panel's appearance
+/// (Customize → Appearance) decides which, so views never check the mode themselves.
+enum Tone {
+    static let tasks = pair(0xD3EBD7, 0x1C1C1E)
+    static let focus = pair(0xD2E2F6, 0x1C1C1E)
+    static let notes = pair(0xF7E9AE, 0x1C1C1E)
+    static let events = pair(0xE2D7F2, 0x1C1C1E)
+    static let ink = pair(0x1C1C1E, 0xF5F5F7)
+    static let inkSoft = pair(0x55555A, 0x98989F)
+    /// A slightly darker version of whatever card color is underneath: highlights, fields, tiles.
+    static let wash = pair(NSColor.black.withAlphaComponent(0.09), NSColor.white.withAlphaComponent(0.08))
+    static let raised = pair(NSColor.white.withAlphaComponent(0.55), NSColor.white.withAlphaComponent(0.14))
+    static let button = pair(0x1C1C1E, 0xF2B33D)
+    static let onButton = pair(0xFFFFFF, 0x1C1C1E)
+    static let timer = pair(0x1C1C1E, 0xF2B33D)
+
+    static func pair(_ light: Int, _ dark: Int) -> Color { pair(hex(light), hex(dark)) }
+    static func pair(_ light: NSColor, _ dark: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light })
+    }
+    static func hex(_ v: Int) -> NSColor {
+        NSColor(srgbRed: CGFloat(v >> 16 & 0xFF) / 255, green: CGFloat(v >> 8 & 0xFF) / 255, blue: CGFloat(v & 0xFF) / 255, alpha: 1)
+    }
+}

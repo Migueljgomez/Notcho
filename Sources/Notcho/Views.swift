@@ -11,6 +11,7 @@ enum Page: String, CaseIterable { case workspace = "Workspace", insights = "Insi
     var editing = false            // a text field has focus: don't collapse on hover-out
     var dragging = false           // moving or resizing a card, or the panel: don't collapse
     var setHeight: (CGFloat) -> Void = { _ in }  // the controller resizes the panel window
+    var applyLook: () -> Void = {}                // the controller sets the panel's appearance
     var page = Page.workspace
     var collapsed = CGSize(width: 200, height: 32)
     var workspace = CGSize(width: 820, height: 330)
@@ -38,7 +39,7 @@ enum Metrics {
     static let outer: CGFloat = 16         // panel edge → cards
     static let cardGap: CGFloat = 12       // between cards, and header → cards
     static let cardPadding: CGFloat = 16   // card edge → content
-    static let cardRadius: CGFloat = 22
+    static let cardRadius = Theme.cardRadius
     static let stack: CGFloat = 10         // between blocks inside a card
 }
 
@@ -46,7 +47,7 @@ enum Metrics {
 
 struct NotchShape: Shape {
     func path(in r: CGRect) -> Path {
-        let top = min(r.width * 0.125, 10), bottom = min(r.height * 0.5, 18)
+        let top = min(r.width * 0.125, 10), bottom = min(r.height * 0.5, 26)
         var p = Path()
         p.move(to: CGPoint(x: r.minX, y: r.minY))
         p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
@@ -67,7 +68,7 @@ struct NotchShape: Shape {
 struct DotMatrix: View {
     let text: String
     var dot: CGFloat = 4
-    var color: Color = Palette.ink
+    var color: Color = Tone.ink
 
     static let glyphs: [Character: [String]] = [
         "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
@@ -136,6 +137,7 @@ struct RootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onChange(of: store.settings.notchLook) { model.applyLook() }
     }
 }
 
@@ -300,7 +302,7 @@ extension EnvironmentValues {
 }
 
 extension CardKind {
-    var color: Color { [Palette.sage, Palette.lavender, Palette.olive, Palette.blue][Self.allCases.firstIndex(of: self)!] }
+    var color: Color { [Tone.tasks, Tone.focus, Tone.notes, Tone.events][Self.allCases.firstIndex(of: self)!] }
 }
 
 struct Card<Content: View>: View {
@@ -314,7 +316,7 @@ struct Card<Content: View>: View {
                     GridRow { ForEach(0..<3, id: \.self) { _ in Circle().frame(width: 3.5, height: 3.5) } }
                 }
             }
-            .foregroundStyle(.black.opacity(grip == nil ? 0 : 0.14))
+            .foregroundStyle(Tone.ink.opacity(grip == nil ? 0 : 0.16))
             .frame(width: 70, height: 14).contentShape(Rectangle())
             .padding(.top, 6)
             .onHover { inside in
@@ -329,7 +331,7 @@ struct Card<Content: View>: View {
                 .padding(.horizontal, Metrics.cardPadding).padding(.bottom, Metrics.cardPadding).padding(.top, 2)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .foregroundStyle(Palette.ink)
+        .foregroundStyle(Tone.ink)
         .background(color, in: RoundedRectangle(cornerRadius: Metrics.cardRadius, style: .continuous))
     }
 }
@@ -339,7 +341,7 @@ struct Placeholder: View {
     var body: some View {
         Card(color: color) {
             Text(title).font(.title2.weight(.semibold))
-            Text(note).foregroundStyle(Palette.inkSoft)
+            Text(note).foregroundStyle(Tone.inkSoft)
         }
     }
 }
@@ -356,7 +358,7 @@ struct CardHeader: View {
 
 struct Dotted: View {
     var body: some View {
-        Line().stroke(style: StrokeStyle(lineWidth: 1, dash: [1, 3])).foregroundStyle(.black.opacity(0.25)).frame(height: 1)
+        Line().stroke(style: StrokeStyle(lineWidth: 1, dash: [1, 3])).foregroundStyle(Tone.ink.opacity(0.25)).frame(height: 1)
     }
     struct Line: Shape {
         func path(in r: CGRect) -> Path { Path { $0.move(to: CGPoint(x: 0, y: r.midY)); $0.addLine(to: CGPoint(x: r.maxX, y: r.midY)) } }
@@ -375,18 +377,18 @@ struct TasksCard: View {
     @State private var reminderTaskID: UUID?
 
     var body: some View {
-        Card(color: Palette.sage) {
+        Card(color: Tone.tasks) {
             HStack {
-                CardHeader(icon: nil, title: "Today's tasks")
+                CardHeader(icon: "checklist", title: "Today's tasks")
                 Spacer()
                 Text(Date.now.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
-                    .font(.callout).foregroundStyle(Palette.inkSoft)
+                    .font(.callout).foregroundStyle(Tone.inkSoft)
             }
             HStack(spacing: 2) {
                 tab("To do", count: store.todo.count, selected: !showCompleted) { showCompleted = false }
                 tab("Completed", count: store.completed.count, selected: showCompleted) { showCompleted = true }
             }
-            .padding(2).background(Palette.wash, in: RoundedRectangle(cornerRadius: 9))
+            .padding(2).background(Tone.wash, in: RoundedRectangle(cornerRadius: 9))
 
             if !showCompleted && store.settings.unfinished == .ask && !store.stale.isEmpty {
                 stalePrompt
@@ -396,24 +398,24 @@ struct TasksCard: View {
             List {
                 if list.isEmpty {
                     Text(showCompleted ? "Nothing completed yet." : "Add your first task below.")
-                        .font(.body).foregroundStyle(Palette.inkSoft).padding(.vertical, 8)
+                        .font(.body).foregroundStyle(Tone.inkSoft).padding(.vertical, 8)
                         .listRowInsets(EdgeInsets()).listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
                 ForEach(list) { task in
                     row(task)
-                        .overlay(alignment: .bottom) { Dotted() }
                         .listRowInsets(EdgeInsets()).listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
                 .onMove(perform: showCompleted ? nil : { store.moveTodo(from: $0, to: $1) })
             }
             .listStyle(.plain).scrollContentBackground(.hidden).scrollIndicators(.never)
             .environment(\.defaultMinListRowHeight, 1)
+            .padding(.horizontal, -8) // row highlights reach 8 pt from the card edge; text stays on the 16 pt line
 
             HStack(spacing: 8) {
                 HStack(spacing: 6) {
-                    Image(systemName: "plus").font(.callout.weight(.semibold)).foregroundStyle(Palette.ink)
+                    Image(systemName: "plus").font(.callout.weight(.semibold)).foregroundStyle(Tone.ink)
                     ZStack(alignment: .leading) {
-                        if draft.isEmpty { Text("Add a task…").foregroundStyle(Palette.ink.opacity(0.7)).allowsHitTesting(false) }
+                        if draft.isEmpty { Text("Add a task…").foregroundStyle(Tone.ink.opacity(0.7)).allowsHitTesting(false) }
                         TextField("", text: $draft)
                             .textFieldStyle(.plain).focused(field, equals: .add)
                             .onSubmit { store.add(draft); draft = ""; field.wrappedValue = .add }
@@ -421,7 +423,7 @@ struct TasksCard: View {
                     .font(.body)
                 }
                 .padding(.horizontal, 10).padding(.vertical, 7)
-                .background(Palette.wash, in: RoundedRectangle(cornerRadius: 9))
+                .background(Tone.wash, in: RoundedRectangle(cornerRadius: 9))
             }
         }
     }
@@ -430,12 +432,17 @@ struct TasksCard: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Text(title).fontWeight(selected ? .semibold : .regular)
-                Text("\(count)").font(.subheadline).foregroundStyle(Palette.inkSoft)
+                Text("\(count)").font(.subheadline).foregroundStyle(Tone.inkSoft)
             }
             .font(.callout).padding(.horizontal, 9).padding(.vertical, 4)
-            .background(selected ? .white.opacity(0.35) : .clear, in: RoundedRectangle(cornerRadius: 7))
+            .background(selected ? Tone.raised : .clear, in: RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
+    }
+
+    /// The task at hand: the one being focused on, else the top of the list.
+    func isCurrent(_ task: TaskItem) -> Bool {
+        !task.done && (store.focusTaskID ?? store.todo.first?.id) == task.id
     }
 
     func row(_ task: TaskItem) -> some View {
@@ -456,22 +463,22 @@ struct TasksCard: View {
                             Circle().fill(Palette.named(p.color)).brightness(-0.1).frame(width: 7, height: 7).help(p.name)
                         }
                         Text(task.title).font(.body).strikethrough(task.done)
-                            .foregroundStyle(store.focusTaskID == task.id ? Color.black : Palette.ink)
+                            .foregroundStyle(Tone.ink).fontWeight(isCurrent(task) ? .semibold : .regular)
                     }
                     if !task.done && (task.timeLimit != nil || task.reminder != nil || task.due != nil) {
                         HStack(spacing: 10) {
                             if let limit = task.timeLimit {
                                 let actual = store.actualMinutes(task.id)
                                 Label(actual > 0 ? "\(actual)/\(limit)m" : "\(limit)m", systemImage: "timer")
-                                    .foregroundStyle(actual > limit ? Color.orange : Palette.inkSoft)
+                                    .foregroundStyle(actual > limit ? Color.orange : Tone.inkSoft)
                             }
                             if let r = task.reminder { Label(reminderLabel(r), systemImage: "bell") }
                             if let due = task.due {
                                 Label(due < store.today ? "Overdue" : "Due " + due.formatted(.dateTime.month(.abbreviated).day()), systemImage: "flag")
-                                    .foregroundStyle(due < store.today ? Color.red.opacity(0.8) : Palette.inkSoft)
+                                    .foregroundStyle(due < store.today ? Color.red.opacity(0.8) : Tone.inkSoft)
                             }
                         }
-                        .font(.subheadline).foregroundStyle(Palette.inkSoft)
+                        .font(.subheadline).foregroundStyle(Tone.inkSoft)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -486,7 +493,7 @@ struct TasksCard: View {
 
             if task.done {
                 Button { store.delete(task.id) } label: { Image(systemName: "trash") }
-                    .buttonStyle(.plain).font(.subheadline).foregroundStyle(Palette.inkSoft).help("Delete")
+                    .buttonStyle(.plain).font(.subheadline).foregroundStyle(Tone.inkSoft).help("Delete")
             } else {
                 HStack(spacing: 8) {
                     Button { store.start(task: task.id) } label: { Image(systemName: "play.fill") }
@@ -514,10 +521,12 @@ struct TasksCard: View {
                     } label: { Image(systemName: "ellipsis") }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 }
-                .buttonStyle(.plain).font(.subheadline.weight(.semibold)).foregroundStyle(Palette.ink)
+                .buttonStyle(.plain).font(.subheadline.weight(.semibold)).foregroundStyle(Tone.ink)
             }
         }
         .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .background(isCurrent(task) ? Tone.wash : .clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .contentShape(Rectangle())
         .popover(isPresented: Binding(get: { limitTaskID == task.id }, set: { if !$0 { limitTaskID = nil } }), arrowEdge: .bottom) {
             SetTimeView(subtitle: task.title, initial: task.timeLimit ?? store.focusMinutes,
@@ -557,19 +566,19 @@ struct TasksCard: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Unfinished tasks").font(.body.weight(.semibold))
             Text("\(store.stale.count) left from before today. Bring \(store.stale.count == 1 ? "it" : "them") into today?")
-                .font(.callout).foregroundStyle(Palette.inkSoft)
+                .font(.callout).foregroundStyle(Tone.inkSoft)
             HStack(spacing: 8) {
                 Button("Move to today") { withAnimation { store.carryStale() } }
-                    .buttonStyle(.plain).font(.callout.weight(.semibold)).foregroundStyle(.white)
-                    .padding(.horizontal, 10).padding(.vertical, 5).background(Palette.ink, in: Capsule())
+                    .buttonStyle(.plain).font(.callout.weight(.semibold)).foregroundStyle(Tone.onButton)
+                    .padding(.horizontal, 10).padding(.vertical, 5).background(Tone.button, in: Capsule())
                 Button("Leave in history") { withAnimation { store.dismissStale() } }
                     .buttonStyle(.plain).font(.callout)
                 Button("Plan in Planner") { PlannerWindow.shared.show(planning: true) }
-                    .buttonStyle(.plain).font(.callout).foregroundStyle(Palette.inkSoft)
+                    .buttonStyle(.plain).font(.callout).foregroundStyle(Tone.inkSoft)
             }
         }
         .padding(10).frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.3), in: RoundedRectangle(cornerRadius: 10))
+        .background(Tone.wash, in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -612,33 +621,34 @@ struct FocusCard: View {
     @State private var showSetTime = false
 
     var body: some View {
-        Card(color: Palette.lavender) {
+        Card(color: Tone.focus) {
+            CardHeader(icon: "timer", title: "Focus")
             // Minutes over seconds, as big as the card allows.
             TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
                 let parts = clock(store.display(at: ctx.date)).split(separator: ":").map(String.init)
                 GeometryReader { g in
                     let dot = max(2, min(g.size.width / 17, g.size.height / 22))
                     VStack(spacing: dot * 1.5) {
-                        ForEach(parts.indices, id: \.self) { DotMatrix(text: parts[$0], dot: dot) }
+                        ForEach(parts.indices, id: \.self) { DotMatrix(text: parts[$0], dot: dot, color: Tone.timer) }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .padding(.top, 4)
-            Text(status).font(.callout).foregroundStyle(Palette.inkSoft).lineLimit(1).frame(maxWidth: .infinity)
+            Text(status).font(.callout).foregroundStyle(Tone.inkSoft).lineLimit(1).frame(maxWidth: .infinity)
             HStack(spacing: 6) {
                 Button(action: primary) {
                     Label(primaryTitle, systemImage: primaryIcon).font(.callout.weight(.semibold))
                         .lineLimit(1).frame(maxWidth: .infinity).padding(.vertical, 8)
-                        .background(Color(red: 0.45, green: 0.42, blue: 0.62), in: Capsule())
+                        .background(Tone.button, in: Capsule())
                 }
                 Button { store.completeFocus() } label: {
                     Image(systemName: "checkmark").font(.callout.weight(.bold)).frame(width: 32, height: 32)
-                        .background(Color(red: 0.45, green: 0.42, blue: 0.62), in: Circle())
+                        .background(Tone.button, in: Circle())
                 }
                 .help("Complete focused task")
             }
-            .buttonStyle(.plain).foregroundStyle(.white)
+            .buttonStyle(.plain).foregroundStyle(Tone.onButton)
             HStack(spacing: 8) {
                 Button { showSetTime = true } label: { Label("Set time", systemImage: "slider.horizontal.3").font(.callout) }
                     .disabled(store.isStopwatch).opacity(store.isStopwatch ? 0.4 : 1)
@@ -728,14 +738,14 @@ struct NotepadCard: View {
     var field: FocusState<Field?>.Binding
 
     var body: some View {
-        Card(color: Palette.olive) {
+        Card(color: Tone.notes) {
             CardHeader(icon: "square.and.pencil", title: "Notepad")
             Text(Date.now.formatted(.dateTime.month(.abbreviated).day().year()))
-                .font(.callout).foregroundStyle(Palette.inkSoft)
-            Rectangle().fill(.black.opacity(0.12)).frame(height: 1)
+                .font(.callout).foregroundStyle(Tone.inkSoft)
+            Rectangle().fill(Tone.ink.opacity(0.12)).frame(height: 1)
             ZStack(alignment: .topLeading) {
                 if store.notes.isEmpty {
-                    Text("Write something down…").foregroundStyle(Palette.inkSoft).padding(.leading, 5).allowsHitTesting(false)
+                    Text("Write something down…").foregroundStyle(Tone.inkSoft).padding(.leading, 5).allowsHitTesting(false)
                 }
                 TextEditor(text: $store.notes).scrollContentBackground(.hidden).focused(field, equals: .notes)
                     .onKeyPress(.return, phases: .down) { press in
@@ -744,7 +754,7 @@ struct NotepadCard: View {
             }
             .font(.body)
             Text("⌘↩ makes a task").help("Press Command–Return to turn the current line into a task")
-                .font(.subheadline).foregroundStyle(Palette.inkSoft).frame(maxWidth: .infinity, alignment: .trailing)
+                .font(.subheadline).foregroundStyle(Tone.inkSoft).frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 }
@@ -774,7 +784,7 @@ struct EventsCard: View {
     let store: Store
 
     var body: some View {
-        Card(color: Palette.blue) {
+        Card(color: Tone.events) {
             HStack {
                 CardHeader(icon: "calendar", title: "Events")
                 Spacer()
@@ -790,7 +800,7 @@ struct EventsCard: View {
                     Image(systemName: store.calendarAccess ? "calendar" : "calendar.badge.exclamationmark").font(.title)
                     Text(store.calendarAccess ? "Nothing scheduled" : "Calendar not connected").font(.title3.weight(.semibold))
                     Text(store.calendarAccess ? "No events in your selected calendars for today." : "Connect it to see today's events here.")
-                        .font(.callout).foregroundStyle(Palette.inkSoft)
+                        .font(.callout).foregroundStyle(Tone.inkSoft)
                     if !store.calendarAccess { Button("Connect Calendar") { store.connectCalendar() } }
                 }
                 .padding(.top, Metrics.stack)
@@ -806,7 +816,7 @@ struct EventsCard: View {
                             HStack {
                                 section("Today")
                                 Spacer()
-                                Text(Date.now.formatted(.dateTime.weekday(.abbreviated).day())).font(.footnote).foregroundStyle(Palette.inkSoft)
+                                Text(Date.now.formatted(.dateTime.weekday(.abbreviated).day())).font(.footnote).foregroundStyle(Tone.inkSoft)
                             }
                             .padding(.top, reminders.isEmpty ? 0 : Metrics.stack)
                             ForEach(store.events, id: \.eventIdentifier) { eventTile($0) }
@@ -822,12 +832,12 @@ struct EventsCard: View {
     }
 
     func section(_ title: String) -> some View {
-        Text(title.uppercased()).font(.footnote.weight(.semibold)).foregroundStyle(Palette.inkSoft)
+        Text(title.uppercased()).font(.footnote.weight(.semibold)).foregroundStyle(Tone.inkSoft)
     }
 
     func tile<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         content().padding(8).frame(maxWidth: .infinity, alignment: .leading)
-            .background(.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(Tone.wash, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     func reminderTile(_ t: TaskItem) -> some View {
@@ -835,7 +845,7 @@ struct EventsCard: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(t.title).font(.body.weight(.semibold)).lineLimit(2)
-                    Text(reminderLabel(t.reminder!)).font(.subheadline).foregroundStyle(Palette.inkSoft)
+                    Text(reminderLabel(t.reminder!)).font(.subheadline).foregroundStyle(Tone.inkSoft)
                 }
                 Spacer(minLength: 4)
                 Menu {
@@ -852,12 +862,12 @@ struct EventsCard: View {
         let live = !e.isAllDay && e.startDate <= now && now < e.endDate
         return tile {
             HStack(alignment: .top, spacing: 8) {
-                RoundedRectangle(cornerRadius: 2).fill(Color(cgColor: e.calendar.cgColor)).frame(width: 3).frame(maxHeight: .infinity)
+                RoundedRectangle(cornerRadius: 2).fill(live ? Theme.now : Color(cgColor: e.calendar.cgColor)).frame(width: 3).frame(maxHeight: .infinity)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(e.title ?? "Untitled").font(.body.weight(.semibold)).lineLimit(2)
                     Text(e.isAllDay ? "All day" : "\(e.startDate.formatted(date: .omitted, time: .shortened)) – \(e.endDate.formatted(date: .omitted, time: .shortened))")
-                        .font(.subheadline).foregroundStyle(Palette.inkSoft)
-                    if live { Text("Happening now").font(.subheadline.weight(.semibold)) }
+                        .font(.subheadline).foregroundStyle(Tone.inkSoft)
+                    if live { Text("Happening now").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.now) }
                 }
             }
             .fixedSize(horizontal: false, vertical: true)

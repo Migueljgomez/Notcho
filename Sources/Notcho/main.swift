@@ -59,6 +59,15 @@ final class NotchController {
             store.settings.panelHeight = Double(min(max(h, 240), screen.frame.height - 120))
             layout()
         }
+        model.applyLook = { [weak self] in
+            guard let self else { return }
+            panel.appearance = switch store.settings.notchLook {
+            case .pastel: NSAppearance(named: .aqua)
+            case .dark: NSAppearance(named: .darkAqua)
+            case .system: nil // follows the Mac
+            }
+        }
+        model.applyLook()
         panel.contentView = NSHostingView(rootView: RootView(model: model, store: store) { [weak self] in self?.closeButton() })
 
         let moves: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .leftMouseUp]

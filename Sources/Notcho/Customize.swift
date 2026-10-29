@@ -21,7 +21,7 @@ struct CustomizeView: View {
     // MARK: General
 
     var general: some View {
-        Card(color: Palette.sage) {
+        Card(color: Tone.tasks) {
             CardHeader(icon: "slider.horizontal.3", title: "General")
             ScrollView { VStack(spacing: Metrics.stack) {
                 row("Launch at login") {
@@ -40,6 +40,13 @@ struct CustomizeView: View {
                     Text(closeLabel).font(.callout.monospacedDigit()).frame(width: 64, alignment: .trailing)
                 }
                 .help("How long the notch stays open after your pointer leaves it")
+                row("Appearance") {
+                    Picker("", selection: $store.settings.notchLook) {
+                        ForEach(NotchLook.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                }
+                .help("Match my Mac: pastel in Light mode, the dark island in Dark mode")
                 Dotted()
                 Text("Your day").font(.body.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
                 row("Day starts at") {
@@ -94,7 +101,7 @@ struct CustomizeView: View {
                 .help("Tasks appear in a Notch list in Reminders, which iCloud syncs to your iPhone. Changes there come back here.")
                 if !store.syncStatus.isEmpty {
                     Text(store.syncStatus).font(.subheadline)
-                        .foregroundStyle(store.syncStatus.hasPrefix("Synced") ? Palette.inkSoft : .red)
+                        .foregroundStyle(store.syncStatus.hasPrefix("Synced") ? Tone.inkSoft : .red)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if let loginError { Text(loginError).font(.subheadline).foregroundStyle(.red) }
@@ -125,7 +132,7 @@ struct CustomizeView: View {
     // MARK: Focus
 
     var focus: some View {
-        Card(color: Palette.lavender) {
+        Card(color: Tone.focus) {
             CardHeader(icon: "timer", title: "Focus")
             VStack(spacing: Metrics.stack) {
                 row("Default timer") {
@@ -146,19 +153,19 @@ struct CustomizeView: View {
                     }
                     .buttonStyle(.plain).font(.body.weight(.medium))
                     .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(Palette.wash, in: RoundedRectangle(cornerRadius: 8))
+                    .background(Tone.wash, in: RoundedRectangle(cornerRadius: 8))
                     .disabled(store.isStopwatch).opacity(store.isStopwatch ? 0.4 : 1)
                 }
                 row("Completion sound") {
                     Toggle("", isOn: $store.settings.completionSound).toggleStyle(.switch).labelsHidden()
                 }
-                Text("A task's time limit overrides the default.").font(.callout).foregroundStyle(Palette.inkSoft)
+                Text("A task's time limit overrides the default.").font(.callout).foregroundStyle(Tone.inkSoft)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Dotted()
                 HStack {
                     Text("Permissions").font(.body.weight(.semibold))
                     Spacer()
-                    Text("v1.0").font(.callout).foregroundStyle(Palette.inkSoft)
+                    Text("v1.0").font(.callout).foregroundStyle(Tone.inkSoft)
                 }
                 HStack(spacing: 14) {
                     Label("Calendar: \(store.calendarAccess ? "On" : "Off")", systemImage: "calendar")
@@ -176,13 +183,13 @@ struct CustomizeView: View {
                     .buttonStyle(.plain).help(store.notificationsOn ? "Notification settings" : "Enable notifications")
                     Spacer()
                 }
-                .font(.callout).foregroundStyle(Palette.inkSoft)
+                .font(.callout).foregroundStyle(Tone.inkSoft)
                 Button {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
                 } label: {
                     Label("Open App Settings", systemImage: "arrow.up.right").labelStyle(TrailingIcon())
                         .font(.callout.weight(.medium)).padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(Palette.wash, in: RoundedRectangle(cornerRadius: 8))
+                        .background(Tone.wash, in: RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain).frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -192,9 +199,9 @@ struct CustomizeView: View {
     // MARK: Workspace
 
     var workspace: some View {
-        Card(color: Palette.blue) {
+        Card(color: Tone.events) {
             CardHeader(icon: "rectangle.3.group", title: "Customize workspace")
-            Text("Drag to reorder. Toggle to show or hide.").font(.callout).foregroundStyle(Palette.inkSoft)
+            Text("Drag to reorder. Toggle to show or hide.").font(.callout).foregroundStyle(Tone.inkSoft)
             List {
                 ForEach(store.settings.orderedCards) { kind in
                     let visible = !store.settings.hiddenCards.contains(kind)
@@ -207,7 +214,7 @@ struct CustomizeView: View {
                         }))
                         .toggleStyle(.switch).labelsHidden().controlSize(.small)
                         .disabled(visible && store.settings.visibleCards.count == 1) // keep at least one card
-                        Image(systemName: "line.3.horizontal").foregroundStyle(Palette.inkSoft)
+                        Image(systemName: "line.3.horizontal").foregroundStyle(Tone.inkSoft)
                     }
                     .padding(.vertical, 4)
                     .listRowInsets(EdgeInsets()).listRowBackground(Color.clear).listRowSeparator(.hidden)
@@ -218,10 +225,10 @@ struct CustomizeView: View {
                     store.settings.cardOrder = order
                 }
             }
-            .listStyle(.plain).scrollContentBackground(.hidden).scrollDisabled(true).foregroundStyle(Palette.ink)
-            Text("Hidden cards keep their content.").font(.callout).foregroundStyle(Palette.inkSoft)
+            .listStyle(.plain).scrollContentBackground(.hidden).scrollDisabled(true).foregroundStyle(Tone.ink)
+            Text("Hidden cards keep their content.").font(.callout).foregroundStyle(Tone.inkSoft)
             Button("Reset layout") { withAnimation(.snappy) { store.settings.resetLayout() } }
-            .buttonStyle(.plain).font(.callout).foregroundStyle(Palette.inkSoft)
+            .buttonStyle(.plain).font(.callout).foregroundStyle(Tone.inkSoft)
         }
     }
 
@@ -271,7 +278,7 @@ struct WorkspaceSettings: View {
                     ZStack(alignment: .topLeading) {
                         ForEach(Array(cards.enumerated()), id: \.element) { i, kind in
                             RoundedRectangle(cornerRadius: 7, style: .continuous).fill(kind.color)
-                                .overlay(Image(systemName: kind.icon).font(.body.weight(.semibold)).foregroundStyle(Palette.ink))
+                                .overlay(Image(systemName: kind.icon).font(.body.weight(.semibold)).foregroundStyle(Tone.ink))
                                 .frame(width: frames[i].width).offset(x: frames[i].x)
                         }
                     }
@@ -308,6 +315,16 @@ struct WorkspaceSettings: View {
                     .listStyle(.plain).scrollContentBackground(.hidden).scrollDisabled(true)
                     .frame(height: CGFloat(CardKind.allCases.count) * 34)
                     Text("Drag to reorder. Hidden cards keep their content.").font(.callout).foregroundStyle(Palette.pInkSoft)
+                }
+                .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("APPEARANCE").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
+                    Picker("", selection: $store.settings.notchLook) {
+                        ForEach(NotchLook.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented).labelsHidden()
+                    Text("Match my Mac: pastel in Light mode, the dark island in Dark mode.").font(.callout).foregroundStyle(Palette.pInkSoft)
                 }
                 .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))
 
