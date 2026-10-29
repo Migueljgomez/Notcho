@@ -348,8 +348,9 @@ struct Placeholder: View {
 struct CardHeader: View {
     let icon: String?, title: String
     var body: some View {
-        HStack(spacing: 8) {
-            if let icon { Image(systemName: icon).font(.title3.weight(.semibold)) }
+        HStack(spacing: 6) {
+            // fixed icon width: every card's title starts at the same spot, tight to its icon
+            if let icon { Image(systemName: icon).font(.title3.weight(.semibold)).frame(width: 18) }
             Text(title).font(.title2.weight(.semibold))
         }
     }
@@ -498,8 +499,6 @@ struct TasksCard: View {
                 HStack(spacing: 8) {
                     Button { store.start(task: task.id) } label: { Image(systemName: "play.fill") }
                         .help("Start focusing on this task")
-                    Button { rename(task) } label: { Image(systemName: "square.and.pencil") }
-                        .help("Rename")
                     Menu {
                         Button { store.start(task: task.id) } label: { Label("Focus", systemImage: "scope") }
                         Button { store.toggle(task.id) } label: { Label("Mark as Done", systemImage: "checkmark") }
