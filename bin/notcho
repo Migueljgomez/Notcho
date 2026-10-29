@@ -1,0 +1,3 @@
+#!/bin/sh
+# `notcho` command: runs the app binary in command mode.
+exec /Applications/Notcho.app/Contents/MacOS/Notcho cli "$@"

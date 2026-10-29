@@ -1,0 +1,3 @@
+#!/bin/sh
+# Old name, kept so existing agent setups keep working.
+exec "$(dirname "$0")/notcho" "$@"
