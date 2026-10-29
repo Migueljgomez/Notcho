@@ -314,8 +314,9 @@ struct Card<Content: View>: View {
                     GridRow { ForEach(0..<3, id: \.self) { _ in Circle().frame(width: 3.5, height: 3.5) } }
                 }
             }
-            .foregroundStyle(.black.opacity(grip == nil ? 0 : 0.28))
+            .foregroundStyle(.black.opacity(grip == nil ? 0 : 0.14))
             .frame(width: 70, height: 14).contentShape(Rectangle())
+            .padding(.top, 6)
             .onHover { inside in
                 guard grip != nil else { return }
                 if inside { NSCursor.openHand.push() } else { NSCursor.pop() }
@@ -410,16 +411,17 @@ struct TasksCard: View {
 
             HStack(spacing: 8) {
                 HStack(spacing: 6) {
-                    Image(systemName: "plus").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.inkSoft)
-                    TextField("Add a task…", text: $draft)
-                        .textFieldStyle(.plain).font(.system(size: 13)).focused(field, equals: .add)
-                        .onSubmit { store.add(draft); draft = ""; field.wrappedValue = .add }
+                    Image(systemName: "plus").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.ink)
+                    ZStack(alignment: .leading) {
+                        if draft.isEmpty { Text("Add a task…").foregroundStyle(Palette.ink.opacity(0.7)).allowsHitTesting(false) }
+                        TextField("", text: $draft)
+                            .textFieldStyle(.plain).focused(field, equals: .add)
+                            .onSubmit { store.add(draft); draft = ""; field.wrappedValue = .add }
+                    }
+                    .font(.system(size: 13))
                 }
                 .padding(.horizontal, 10).padding(.vertical, 7)
                 .background(Palette.wash, in: RoundedRectangle(cornerRadius: 9))
-                if !showCompleted && store.todo.count > 1 {
-                    Text("Drag to reorder").font(.system(size: 11)).foregroundStyle(Palette.inkSoft).fixedSize()
-                }
             }
         }
     }
@@ -611,22 +613,19 @@ struct FocusCard: View {
 
     var body: some View {
         Card(color: Palette.lavender) {
+            // Minutes over seconds, as big as the card allows.
             TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
-                VStack(spacing: 8) {
-                    DotMatrix(text: clock(store.display(at: ctx.date)), dot: 3.6).padding(.top, Metrics.stack)
-                    Text(status).font(.system(size: 12)).foregroundStyle(Palette.inkSoft).lineLimit(1)
-                    GeometryReader { g in
-                        // Stopwatch fills against the default duration as a gentle target.
-                        let goal = store.isStopwatch ? TimeInterval(store.focusMinutes * 60) : store.focusTotal
-                        let done = goal > 0 ? min(1, store.spent(at: ctx.date) / goal) : 0
-                        Capsule().fill(.black.opacity(0.12))
-                            .overlay(alignment: .leading) { Capsule().fill(Palette.ink).frame(width: g.size.width * done) }
+                let parts = clock(store.display(at: ctx.date)).split(separator: ":").map(String.init)
+                GeometryReader { g in
+                    let dot = max(2, min(g.size.width / 17, g.size.height / 22))
+                    VStack(spacing: dot * 1.5) {
+                        ForEach(parts.indices, id: \.self) { DotMatrix(text: parts[$0], dot: dot) }
                     }
-                    .frame(height: 3).padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity)
             }
-            Spacer()
+            .padding(.top, 4)
+            Text(status).font(.system(size: 12)).foregroundStyle(Palette.inkSoft).lineLimit(1).frame(maxWidth: .infinity)
             HStack(spacing: 6) {
                 Button(action: primary) {
                     Label(primaryTitle, systemImage: primaryIcon).font(.system(size: 12, weight: .semibold))
@@ -744,12 +743,8 @@ struct NotepadCard: View {
                     }
             }
             .font(.system(size: 13))
-            HStack {
-                Label("\(wordCount(store.notes)) words", systemImage: "text.alignleft")
-                Spacer()
-                Text("⌘↩ makes a task").help("Press Command–Return to turn the current line into a task")
-            }
-            .font(.system(size: 11)).foregroundStyle(Palette.inkSoft)
+            Text("⌘↩ makes a task").help("Press Command–Return to turn the current line into a task")
+                .font(.system(size: 11)).foregroundStyle(Palette.inkSoft).frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 }
@@ -792,9 +787,9 @@ struct EventsCard: View {
             let reminders = store.reminders
             if reminders.isEmpty && (!store.calendarAccess || store.events.isEmpty) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Image(systemName: store.calendarAccess ? "calendar" : "calendar.badge.plus").font(.system(size: 20))
-                    Text(store.calendarAccess ? "Nothing scheduled" : "Calendar access").font(.system(size: 14, weight: .semibold))
-                    Text(store.calendarAccess ? "No events in your selected calendars for today." : "Show today's events here.")
+                    Image(systemName: store.calendarAccess ? "calendar" : "calendar.badge.exclamationmark").font(.system(size: 20))
+                    Text(store.calendarAccess ? "Nothing scheduled" : "Calendar not connected").font(.system(size: 14, weight: .semibold))
+                    Text(store.calendarAccess ? "No events in your selected calendars for today." : "Connect it to see today's events here.")
                         .font(.system(size: 12)).foregroundStyle(Palette.inkSoft)
                     if !store.calendarAccess { Button("Connect Calendar") { store.connectCalendar() } }
                 }
@@ -822,13 +817,6 @@ struct EventsCard: View {
                     }
                 }
                 .scrollIndicators(.never)
-            }
-            if store.calendarAccess {
-                HStack {
-                    Label("Connected", systemImage: "checkmark.circle").font(.system(size: 12))
-                    Spacer()
-                    Button { store.loadEvents() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.plain).help("Refresh")
-                }
             }
         }
     }
