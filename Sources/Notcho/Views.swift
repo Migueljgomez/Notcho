@@ -656,7 +656,7 @@ extension Store {
 
 // MARK: - Focus
 
-/// The Focus card's ✓, in the tasks card's green. With `hold` on, a ring fills while it's pressed and the task completes when it closes.
+/// The Focus card's ✓. With `hold` on, a ring fills while it's pressed and the task completes when it closes.
 struct CompleteButton: View {
     let hold: Bool
     let action: () -> Void
@@ -664,9 +664,9 @@ struct CompleteButton: View {
     static let holdTime = 0.8
 
     var body: some View {
-        let face = Image(systemName: "checkmark").font(.callout.weight(.bold)).foregroundStyle(Tone.ink)
+        let face = Image(systemName: "checkmark").font(.callout.weight(.bold)).foregroundStyle(Tone.onButton)
             .frame(width: 32, height: 32)
-            .background(Tone.tasks, in: Circle()) // the Today's tasks card's green
+            .background(Tone.button, in: Circle())
             .overlay {
                 Circle().inset(by: -3).trim(from: 0, to: progress)
                     .stroke(Tone.ink, style: StrokeStyle(lineWidth: 2.5, lineCap: .round)).rotationEffect(.degrees(-90))
