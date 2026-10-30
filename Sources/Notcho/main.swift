@@ -192,7 +192,8 @@ final class NotchController {
         appliedWidth = store.settings.panelWidth
         workspace = NotchLayout.workspaceFrame(screen: screen.frame, height: CGFloat(appliedHeight), width: CGFloat(appliedWidth))
         pill = NotchLayout.pillFrame(notch: notch)
-        model.collapsed = notch.size
+        // Draw the closed shape at the camera housing's own height (32 pt on a 16"), not the taller menu bar, so nothing peeks out below.
+        model.collapsed = CGSize(width: notch.width, height: screen.safeAreaInsets.top > 0 ? min(screen.safeAreaInsets.top, notch.height) : notch.height)
         model.workspace = workspace.size
         model.notchOffsetX = notch.midX - workspace.midX
         model.pill = CGRect(x: pill.minX - workspace.minX, y: workspace.maxY - pill.maxY, width: pill.width, height: pill.height)
