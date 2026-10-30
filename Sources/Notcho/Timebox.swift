@@ -342,7 +342,7 @@ struct WeekCalendar: View {
                                 Spacer(minLength: 0)
                                 if let m = t.timeLimit { Text(estimate(m)).font(.footnote.monospacedDigit()).foregroundStyle(Palette.pInkSoft) }
                             }
-                            .padding(8).background(Palette.card, in: RoundedRectangle(cornerRadius: 8))
+                            .padding(8).background(Palette.card, in: RoundedRectangle(cornerRadius: 6))
                             .draggable(t.id.uuidString)
                         }
                         if toSchedule.isEmpty { Text("Everything open is scheduled.").font(.callout).foregroundStyle(Palette.pInkSoft) }
@@ -372,7 +372,7 @@ struct WeekCalendar: View {
                             VStack(spacing: 1) {
                                 Text(d.formatted(.dateTime.weekday(.abbreviated))).font(.subheadline).foregroundStyle(Palette.pInkSoft)
                                 Text(d.formatted(.dateTime.day())).font(.title3.weight(Calendar.current.isDateInToday(d) ? .bold : .regular))
-                                    .foregroundStyle(Calendar.current.isDateInToday(d) ? Color.red : Palette.pInk)
+                                    .foregroundStyle(Calendar.current.isDateInToday(d) ? Tone.alert : Palette.pInk)
                             }
                             .frame(maxWidth: .infinity)
                         }

@@ -56,7 +56,6 @@ struct Settings: Codable, Equatable {
     var workdayEndHour = 18   // Planner workload meter: time left until this hour
     var breakAfterMinutes = 90  // break nudge after this much unbroken focus; 0 = off
     var wrapUpHour = 17         // daily wrap-up banner at this hour; 0 = off
-    var plannerDark = false     // Planner window in dark mode (the notch is unaffected)
     var cardWeights: [CardKind: Double] = [:]  // resized card widths; missing = the card's default
     var panelHeight = Double(Metrics.panelHeight)
     var closeAfter = 0.0        // seconds the notch waits after the pointer leaves; `stayOpen` = only click-away, Esc or ✕
@@ -82,7 +81,6 @@ struct Settings: Codable, Equatable {
         workdayEndHour = (try? c.decodeIfPresent(Int.self, forKey: .workdayEndHour)) ?? d.workdayEndHour
         breakAfterMinutes = (try? c.decodeIfPresent(Int.self, forKey: .breakAfterMinutes)) ?? d.breakAfterMinutes
         wrapUpHour = (try? c.decodeIfPresent(Int.self, forKey: .wrapUpHour)) ?? d.wrapUpHour
-        plannerDark = (try? c.decodeIfPresent(Bool.self, forKey: .plannerDark)) ?? d.plannerDark
         cardWeights = (try? c.decodeIfPresent([CardKind: Double].self, forKey: .cardWeights)) ?? d.cardWeights
         panelHeight = (try? c.decodeIfPresent(Double.self, forKey: .panelHeight)) ?? d.panelHeight
         closeAfter = (try? c.decodeIfPresent(Double.self, forKey: .closeAfter)) ?? d.closeAfter

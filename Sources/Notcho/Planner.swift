@@ -36,15 +36,10 @@ final class PlannerWindow: NSObject, NSWindowDelegate {
             w.setFrameAutosaveName("Planner")
             window = w
         }
-        applyAppearance()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate()
     }
 
-    /// Light unless the user turned on dark mode for the Planner (never follows the system, so nothing flips unexpectedly).
-    func applyAppearance() {
-        window?.appearance = NSAppearance(named: store?.settings.plannerDark == true ? .darkAqua : .aqua)
-    }
 
     func windowWillClose(_ notification: Notification) {
         window = nil // drops the whole view tree
@@ -57,16 +52,25 @@ final class PlannerWindow: NSObject, NSWindowDelegate {
 extension Palette {
     static let rose = Color(red: 0.82, green: 0.60, blue: 0.62)
     static let sand = Color(red: 0.80, green: 0.71, blue: 0.56)
-    // Planner colors follow the Planner window's light/dark setting; the notch keeps its own fixed colors
+    // Planner colors follow the Mac's Light/Dark setting; the notch keeps its own look
     static func dyn(_ light: NSColor, _ dark: NSColor) -> Color {
         Color(nsColor: NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light })
     }
-    static let cream = dyn(NSColor(red: 0.965, green: 0.955, blue: 0.93, alpha: 1), NSColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1))
-    static let sidebar = dyn(NSColor(red: 0.935, green: 0.925, blue: 0.895, alpha: 1), NSColor(red: 0.145, green: 0.145, blue: 0.155, alpha: 1))
-    static let card = dyn(.white, NSColor(red: 0.19, green: 0.19, blue: 0.2, alpha: 1))
-    static let pInk = dyn(.black.withAlphaComponent(0.82), .white.withAlphaComponent(0.88))
-    static let pInkSoft = dyn(.black.withAlphaComponent(0.5), .white.withAlphaComponent(0.55))
-    static let pWash = dyn(.black.withAlphaComponent(0.07), .white.withAlphaComponent(0.1))
+    static let cream = dyn(.white, Tone.hex(0x1E1E1E))   // the content area (name kept from the paper look)
+    static let card = dyn(Tone.hex(0xF5F5F7), Tone.hex(0x2C2C2E))
+    static let pInk = dyn(.black.withAlphaComponent(0.88), .white.withAlphaComponent(0.9))
+    /// Secondary text at 4.5:1 or better on `cream` and `card`; darker still with Increase Contrast.
+    static let pInkSoft = Tone.pair(Tone.hex(0x636366), Tone.hex(0xAEAEB2), contrast: (Tone.hex(0x3A3A3C), Tone.hex(0xD1D1D6)))
+    static let pWash = dyn(.black.withAlphaComponent(0.06), .white.withAlphaComponent(0.1))
+    /// The selected sidebar row: a gold tint with dark-gold text.
+    static let selected = dyn(NSColor(srgbRed: 0.949, green: 0.702, blue: 0.239, alpha: 0.30), NSColor(srgbRed: 0.949, green: 0.702, blue: 0.239, alpha: 0.28))
+    static let selectedInk = dyn(Tone.hex(0x6B4300), Tone.hex(0xFFD27A))
+    static let onGold = Color(nsColor: Tone.hex(0x1C1C1E))
+    /// A project color dark (or light) enough to read as text.
+    static func readable(_ name: String) -> Color {
+        let c = NSColor(named(name))
+        return dyn(c.blended(withFraction: 0.5, of: .black) ?? c, c.blended(withFraction: 0.35, of: .white) ?? c)
+    }
     static func named(_ name: String) -> Color {
         switch name {
         case "lavender": lavender
@@ -97,7 +101,7 @@ struct PlannerView: View {
         HStack(spacing: 0) {
             PlannerSidebar(store: store, section: $section)
                 .frame(width: 220)
-                .background(Palette.sidebar)
+                .background(SidebarMaterial().ignoresSafeArea())
             if section == .notes {
                 NotesView(store: store).frame(maxWidth: .infinity)
             } else if section == .goals {
@@ -130,6 +134,7 @@ struct PlannerView: View {
         }
         .background(Palette.cream)
         .foregroundStyle(Palette.pInk)
+        .tint(Theme.gold)
         .onChange(of: section) { selected = nil; if section == .today { showCalendar = true } }
         .background(
             Button("") { if let id = selected { store.schedule(id, day: store.today) } }
@@ -201,7 +206,7 @@ struct PlannerSidebar: View {
                                     .onExitCommand { renaming = nil }
                             }
                             .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(Palette.card, in: RoundedRectangle(cornerRadius: 7))
+                            .background(Palette.card, in: RoundedRectangle(cornerRadius: 6))
                             .onAppear { renameFocused = true }
                         } else {
                         row(.project(p.id), p.name, "circle.fill", Palette.named(p.color),
@@ -236,15 +241,7 @@ struct PlannerSidebar: View {
             }
             Spacer(minLength: 0)
             row(.workspace, "Workspace", "rectangle.3.group", Palette.pInkSoft, nil)
-            Button {
-                store.settings.plannerDark.toggle()
-                PlannerWindow.shared.applyAppearance()
-            } label: {
-                Label(store.settings.plannerDark ? "Light mode" : "Dark mode", systemImage: store.settings.plannerDark ? "sun.max" : "moon")
-                    .font(.callout.weight(.medium)).foregroundStyle(Palette.pInkSoft)
-                    .padding(.horizontal, 10).padding(.vertical, 8)
-            }
-            .buttonStyle(.plain).padding(.bottom, 8)
+                .padding(.bottom, 10)
         }
         .padding(.horizontal, 10)
     }
@@ -255,11 +252,12 @@ struct PlannerSidebar: View {
             HStack(spacing: 9) {
                 Image(systemName: icon).font(.callout.weight(.semibold)).foregroundStyle(tint).frame(width: 18)
                 Text(title).font(.body.weight(section == s ? .semibold : .regular)).lineLimit(1)
+                    .foregroundStyle(section == s ? Palette.selectedInk : Palette.pInk)
                 Spacer()
                 if let count, count > 0 { Text("\(count)").font(.subheadline).foregroundStyle(Palette.pInkSoft) }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(section == s ? Palette.pWash : .clear, in: RoundedRectangle(cornerRadius: 7))
+            .background(section == s ? Palette.selected : .clear, in: RoundedRectangle(cornerRadius: 6))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -356,7 +354,7 @@ struct PlannerList: View {
                     Spacer()
                     if section == .today {
                         Button { PlannerRouter.shared.planning = true } label: { Label("Plan your day", systemImage: "sun.horizon") }
-                            .buttonStyle(Pill(fill: Palette.pWash))
+                            .buttonStyle(Pill(fill: Theme.gold, text: Palette.onGold))
                         Button { PlannerRouter.shared.wrapUp = true } label: { Label("Wrap up", systemImage: "moon.stars") }
                             .buttonStyle(Pill(fill: Palette.pWash))
                     }
@@ -377,7 +375,8 @@ struct PlannerList: View {
                         .onSubmit(add)
                 }
                 .padding(10)
-                .background(Palette.card.opacity(0.7), in: RoundedRectangle(cornerRadius: 10))
+                .background(Palette.card, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.gold, lineWidth: 2).opacity(adding ? 1 : 0))
                 .padding(.horizontal, 24).padding(.bottom, 10)
             }
 
@@ -451,6 +450,7 @@ struct PlannerRow: View {
                     .font(.title2).foregroundStyle(task.done ? Palette.sage : Palette.pInkSoft)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(task.done ? "Mark \(task.title) as incomplete" : "Mark \(task.title) as complete")
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     if let s = task.startTime { chip(s.formatted(date: .omitted, time: .shortened), Palette.named(project?.color ?? "sand")) }
@@ -462,14 +462,14 @@ struct PlannerRow: View {
                 }
                 HStack(spacing: 10) {
                     if let o = store.objectives.first(where: { $0.id == task.objectiveID }) {
-                        Label(o.title, systemImage: "target").font(.subheadline.weight(.medium)).foregroundStyle(Palette.rose).brightness(-0.25).lineLimit(1)
+                        Label(o.title, systemImage: "target").font(.subheadline.weight(.medium)).foregroundStyle(Palette.readable("rose")).lineLimit(1)
                     }
                     if let p = project {
-                        Text("# \(p.name)").font(.subheadline.weight(.medium)).foregroundStyle(Palette.named(p.color).opacity(1)).brightness(-0.25)
+                        Text("# \(p.name)").font(.subheadline.weight(.medium)).foregroundStyle(Palette.readable(p.color))
                     }
                     if let due = task.due {
                         Label(due.formatted(.dateTime.month(.abbreviated).day()), systemImage: "flag")
-                            .font(.subheadline).foregroundStyle(due < store.today ? .red : Palette.pInkSoft)
+                            .font(.subheadline).foregroundStyle(due < store.today ? Tone.alert : Palette.pInkSoft)
                     }
                     if task.reminder != nil { Image(systemName: "bell").font(.footnote).foregroundStyle(Palette.pInkSoft) }
                     if task.notes?.isEmpty == false { Image(systemName: "note.text").font(.footnote).foregroundStyle(Palette.pInkSoft) }
@@ -478,28 +478,28 @@ struct PlannerRow: View {
             Spacer(minLength: 8)
             if !task.done && !store.todo.contains(where: { $0.id == task.id }) {
                 Button { store.schedule(task.id, day: store.today) } label: { Label("Today", systemImage: "sun.max.fill") }
-                    .buttonStyle(Pill(fill: .orange.opacity(0.15), text: .orange)).help("Add to Today (⌘T)")
+                    .buttonStyle(Pill(fill: .orange.opacity(0.15), text: Tone.warning)).help("Add to Today (⌘T)")
             }
             let actual = store.actualMinutes(task.id)
             if task.timeLimit != nil || actual > 0 {
                 Text(actual > 0 ? "\(estimate(actual)) / \(task.timeLimit.map(estimate) ?? "–")" : estimate(task.timeLimit!))
                     .font(.subheadline.weight(.medium).monospacedDigit())
-                    .foregroundStyle(actual > (task.timeLimit ?? .max) ? Color.orange : Palette.pInk)
+                    .foregroundStyle(actual > (task.timeLimit ?? .max) ? Tone.warning : Palette.pInk)
                     .help(actual > 0 ? "Actual / planned" : "Planned")
                     .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Palette.pWash, in: RoundedRectangle(cornerRadius: 5))
+                    .background(Palette.pWash, in: RoundedRectangle(cornerRadius: 6))
             }
         }
         .padding(12)
         .background(Palette.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(selected ? Palette.pInk.opacity(0.35) : .clear, lineWidth: 1.5))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(selected ? Theme.gold : .clear, lineWidth: 2))
         .contentShape(Rectangle())
     }
 
     func chip(_ text: String, _ color: Color) -> some View {
         Text(text).font(.footnote.weight(.semibold)).foregroundStyle(.white)
             .padding(.horizontal, 5).padding(.vertical, 2)
-            .background(color, in: RoundedRectangle(cornerRadius: 4))
+            .background(color, in: RoundedRectangle(cornerRadius: 6))
     }
 }
 
@@ -606,12 +606,12 @@ struct TaskDetail: View {
                         TextEditor(text: $notes)
                             .font(.body).scrollContentBackground(.hidden)
                             .frame(minHeight: 160)
-                            .padding(8).background(Palette.card, in: RoundedRectangle(cornerRadius: 8))
+                            .padding(8).background(Palette.card, in: RoundedRectangle(cornerRadius: 6))
                             .onChange(of: notes) { later() }
                     }
 
                     Button(role: .destructive) { save(); store.delete(id); close() } label: { Label("Delete task", systemImage: "trash") }
-                        .buttonStyle(.plain).font(.callout).foregroundStyle(.red.opacity(0.8))
+                        .buttonStyle(.plain).font(.callout).foregroundStyle(Tone.alert)
                 }
                 .padding(.horizontal, 20).padding(.bottom, 20)
             }
@@ -696,13 +696,13 @@ struct WorkloadMeter: View {
                 HStack(spacing: 6) {
                     Text("\(estimate(planned)) planned · \(estimate(left)) left until \(end.formatted(date: .omitted, time: .shortened))")
                         .font(.callout.weight(.medium).monospacedDigit())
-                    if over { Text("Over by \(estimate(planned - left))").font(.subheadline.weight(.semibold)).foregroundStyle(.orange) }
+                    if over { Text("Over by \(estimate(planned - left))").font(.subheadline.weight(.semibold)).foregroundStyle(Tone.warning) }
                 }
                 if unestimated > 0 {
                     Text("\(unestimated) task\(unestimated == 1 ? "" : "s") without an estimate").font(.subheadline).foregroundStyle(Palette.pInkSoft)
                 }
             }
-            .foregroundStyle(over ? Color.orange : Palette.pInk)
+            .foregroundStyle(over ? Tone.warning : Palette.pInk)
         }
     }
 }
@@ -769,7 +769,7 @@ struct PlanYourDay: View {
                     Text(t.title).font(.body).lineLimit(1)
                     if let due = t.due {
                         Text(due < store.today ? "overdue" : "due " + due.formatted(.dateTime.month(.abbreviated).day()))
-                            .font(.subheadline).foregroundStyle(due < store.today ? .red : Palette.pInkSoft)
+                            .font(.subheadline).foregroundStyle(due < store.today ? Tone.alert : Palette.pInkSoft)
                     }
                     Spacer()
                     EstimateControl(store: store, task: t)
@@ -778,11 +778,11 @@ struct PlanYourDay: View {
                             .buttonStyle(Pill(fill: Palette.pWash))
                     } else {
                         Button { store.schedule(t.id, day: store.today) } label: { Label("Today", systemImage: "plus") }
-                            .buttonStyle(Pill(fill: .orange, text: .white))
+                            .buttonStyle(Pill(fill: Theme.gold, text: Palette.onGold))
                     }
                 }
                 .padding(.horizontal, 10).padding(.vertical, 7)
-                .background(Palette.card, in: RoundedRectangle(cornerRadius: 8))
+                .background(Palette.card, in: RoundedRectangle(cornerRadius: 6))
             }
         }
     }
@@ -887,7 +887,7 @@ struct NotesView: View {
                                 Text(label(d)).font(.body.weight(day == d ? .semibold : .regular))
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal, 10).padding(.vertical, 6)
-                                    .background(day == d ? Palette.pWash : .clear, in: RoundedRectangle(cornerRadius: 7))
+                                    .background(day == d ? Palette.pWash : .clear, in: RoundedRectangle(cornerRadius: 6))
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -963,7 +963,7 @@ struct WrapUp: View {
                         if finishedToday.isEmpty { Text("Nothing checked off yet. That's okay.").font(.callout).foregroundStyle(Palette.pInkSoft) }
                         ForEach(finishedToday) { t in
                             Text("✓ " + t.title).font(.body).padding(.horizontal, 10).padding(.vertical, 6)
-                                .frame(maxWidth: .infinity, alignment: .leading).background(Palette.card, in: RoundedRectangle(cornerRadius: 8))
+                                .frame(maxWidth: .infinity, alignment: .leading).background(Palette.card, in: RoundedRectangle(cornerRadius: 6))
                         }
                     }
                     VStack(alignment: .leading, spacing: 6) {
@@ -978,7 +978,7 @@ struct WrapUp: View {
                                 Button("Someday") { store.schedule(t.id, day: nil, someday: true) }
                                     .buttonStyle(Pill(fill: Palette.pWash))
                             }
-                            .padding(.horizontal, 10).padding(.vertical, 6).background(Palette.card, in: RoundedRectangle(cornerRadius: 8))
+                            .padding(.horizontal, 10).padding(.vertical, 6).background(Palette.card, in: RoundedRectangle(cornerRadius: 6))
                         }
                     }
                     VStack(alignment: .leading, spacing: 6) {
@@ -990,7 +990,7 @@ struct WrapUp: View {
                             }
                             TextEditor(text: $highlights).font(.body).scrollContentBackground(.hidden).padding(8)
                         }
-                        .frame(height: 90).background(Palette.card, in: RoundedRectangle(cornerRadius: 8))
+                        .frame(height: 90).background(Palette.card, in: RoundedRectangle(cornerRadius: 6))
                     }
                 }
             }
@@ -1146,4 +1146,14 @@ struct GoalsView: View {
             }
         }
     }
+}
+
+/// The Mac's frosted sidebar material; turns solid on its own with Reduce Transparency.
+struct SidebarMaterial: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.material = .sidebar; v.blendingMode = .behindWindow; v.state = .followsWindowActiveState
+        return v
+    }
+    func updateNSView(_ v: NSVisualEffectView, context: Context) {}
 }
