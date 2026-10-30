@@ -36,8 +36,18 @@ final class PlannerWindow: NSObject, NSWindowDelegate {
             w.setFrameAutosaveName("Planner")
             window = w
         }
+        applyAppearance()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate()
+    }
+
+    /// Match my Mac by default; Light or Dark from the sidebar's control.
+    func applyAppearance() {
+        window?.appearance = switch store?.settings.plannerLook ?? .system {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
     }
 
 
@@ -241,7 +251,14 @@ struct PlannerSidebar: View {
             }
             Spacer(minLength: 0)
             row(.workspace, "Workspace", "rectangle.3.group", Palette.pInkSoft, nil)
-                .padding(.bottom, 10)
+            Picker("Appearance", selection: Binding(get: { store.settings.plannerLook }, set: {
+                store.settings.plannerLook = $0; PlannerWindow.shared.applyAppearance()
+            })) {
+                Image(systemName: "circle.lefthalf.filled").help("Match my Mac").tag(PlannerLook.system)
+                Image(systemName: "sun.max").help("Light").tag(PlannerLook.light)
+                Image(systemName: "moon").help("Dark").tag(PlannerLook.dark)
+            }
+            .pickerStyle(.segmented).labelsHidden().padding(.horizontal, 10).padding(.top, 6).padding(.bottom, 12)
         }
         .padding(.horizontal, 10)
     }

@@ -24,6 +24,8 @@ func cardFrames(_ weights: [CGFloat], width: CGFloat, gap: CGFloat) -> [(x: CGFl
 /// How the notch looks. Match my Mac: pastel in Light mode, the dark island in Dark mode.
 enum NotchLook: String, Codable, CaseIterable { case pastel = "Pastel", dark = "Dark island", system = "Match my Mac" }
 
+enum PlannerLook: String, Codable, CaseIterable { case system = "Match my Mac", light = "Light", dark = "Dark" }
+
 enum Unfinished: String, Codable, CaseIterable { case ask = "Ask me", carry = "Move to today", leave = "Leave in history" }
 
 enum TimerClick: String, Codable, CaseIterable { case pause = "Pause / Resume", restart = "Restart timer" }
@@ -61,6 +63,7 @@ struct Settings: Codable, Equatable {
     var closeAfter = 0.0        // seconds the notch waits after the pointer leaves; `stayOpen` = only click-away, Esc or ✕
     static let stayOpen = 3.5
     var notchLook = NotchLook.pastel
+    var plannerLook = PlannerLook.system
     var holdToComplete = true   // Focus ✓ needs a press-and-hold
     var timerClick = TimerClick.pause  // clicking the clock on the task already being timed
 
@@ -85,6 +88,7 @@ struct Settings: Codable, Equatable {
         panelHeight = (try? c.decodeIfPresent(Double.self, forKey: .panelHeight)) ?? d.panelHeight
         closeAfter = (try? c.decodeIfPresent(Double.self, forKey: .closeAfter)) ?? d.closeAfter
         notchLook = (try? c.decodeIfPresent(NotchLook.self, forKey: .notchLook)) ?? d.notchLook
+        plannerLook = (try? c.decodeIfPresent(PlannerLook.self, forKey: .plannerLook)) ?? d.plannerLook
         holdToComplete = (try? c.decodeIfPresent(Bool.self, forKey: .holdToComplete)) ?? d.holdToComplete
         timerClick = (try? c.decodeIfPresent(TimerClick.self, forKey: .timerClick)) ?? d.timerClick
     }
