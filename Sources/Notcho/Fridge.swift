@@ -83,6 +83,10 @@ struct FridgeItem: Codable, Identifiable, Equatable {
     // MARK: Adding
 
     func add(file url: URL, keep: Bool = false) {
+        let path = url.standardizedFileURL.path(percentEncoded: false) // already on the door (or dragged back onto it): bring it forward
+        if let old = items.first(where: { urls[$0.id]?.standardizedFileURL.path(percentEncoded: false) == path || $0.keptPath == path }) {
+            return bringForward(old.id, keep: keep)
+        }
         guard let mark = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil) else { return }
         let item = newItem(name: url.lastPathComponent, bookmark: mark)
         if insert(item), keep { self.keep(item.id) }
@@ -91,9 +95,17 @@ struct FridgeItem: Codable, Identifiable, Equatable {
     func add(text: String, keep: Bool = false) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
+        if let old = items.first(where: { $0.text == t }) { return bringForward(old.id, keep: keep) }
         let first = t.components(separatedBy: .newlines).first ?? t
         let item = newItem(name: String(first.prefix(40)), text: t)
         if insert(item), keep { self.keep(item.id) }
+    }
+
+    private func bringForward(_ id: UUID, keep: Bool) {
+        guard let i = items.firstIndex(where: { $0.id == id }) else { return }
+        items.insert(items.remove(at: i), at: 0)
+        save()
+        if keep { self.keep(id) }
     }
 
     private func newItem(name: String, bookmark: Data? = nil, text: String? = nil) -> FridgeItem {
@@ -132,11 +144,7 @@ struct FridgeItem: Codable, Identifiable, Equatable {
                 }
             } else if p.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
                 p.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
-                    guard let data, let png = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) else { return }
-                    let url = Self.dropsDir.appending(path: "Dropped image \(Int(Date.now.timeIntervalSince1970)).png")
-                    try? FileManager.default.createDirectory(at: Self.dropsDir, withIntermediateDirectories: true)
-                    guard (try? png.write(to: url)) != nil else { return }
-                    DispatchQueue.main.async { self.add(file: url, keep: keep) }
+                    if let data { DispatchQueue.main.async { self.add(image: data, keep: keep) } }
                 }
             } else if p.canLoadObject(ofClass: URL.self) { // a web link: keep it as a note
                 _ = p.loadObject(ofClass: URL.self) { url, _ in
@@ -148,6 +156,30 @@ struct FridgeItem: Codable, Identifiable, Equatable {
                 }
             }
         }
+    }
+
+    /// An image with no file behind it (from a browser, or copied): saved as a PNG, then linked like any file.
+    func add(image data: Data, keep: Bool = false) {
+        guard let png = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) else { return }
+        let url = Self.unique(Self.dropsDir.appending(path: "Image \(Int(Date.now.timeIntervalSince1970)).png"))
+        try? FileManager.default.createDirectory(at: Self.dropsDir, withIntermediateDirectories: true)
+        guard (try? png.write(to: url)) != nil else { return }
+        add(file: url, keep: keep)
+    }
+
+    /// ⌘V: copied files first, then an image, then text (it becomes a note).
+    func paste(from pb: NSPasteboard = .general) {
+        if let files = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !files.isEmpty {
+            files.reversed().forEach { add(file: $0) } // first copied ends up first
+        } else if let data = pb.data(forType: .png) ?? pb.data(forType: .tiff) {
+            add(image: data)
+        } else if let text = pb.string(forType: .string) {
+            add(text: text)
+        }
+    }
+
+    static func canPaste(_ pb: NSPasteboard = .general) -> Bool {
+        pb.availableType(from: [.fileURL, .png, .tiff, .string]) != nil
     }
 
     // MARK: Keep, remove
@@ -247,8 +279,9 @@ struct FridgeItem: Codable, Identifiable, Equatable {
 struct FridgeCard: View {
     var fridge = Fridge.shared
     @Environment(\.colorScheme) private var scheme
-    @State private var targeted = false
-    @State private var barTargeted = false
+    @State private var targeted = false     // something is being dragged over the card
+    @State private var barTargeted = false  // …over the Keep bar at the bottom
+    @FocusState private var focused: Bool
     @State private var preview: URL?
     @State private var showAll = false
     static let ink = Color(nsColor: Tone.hex(0x1D1D1F))   // the doors are light in every look
@@ -273,10 +306,18 @@ struct FridgeCard: View {
                 }
             }
             .frame(width: w, height: h)
+            .contentShape(Rectangle())
+            .onTapGesture { focused = true } // then ⌘V pastes; magnets keep their own clicks
+            .contextMenu {
+                Button { fridge.paste() } label: { Label("Paste", systemImage: "doc.on.clipboard") }.disabled(!Fridge.canPaste())
+            }
             .quickLookPreview($preview)
             .clipShape(RoundedRectangle(cornerRadius: Metrics.cardRadius, style: .continuous))
-            .onDrop(of: Fridge.dropTypes, isTargeted: $targeted) { fridge.drop($0, keep: false); return true }
+            // One drop target for the whole card; where it lands decides Keep, so the bar can't flicker away under the pointer.
+            .onDrop(of: Fridge.dropTypes, delegate: FridgeDrop(fridge: fridge, keepFrom: h - 54, targeted: $targeted, overBar: $barTargeted))
         }
+        .focusable().focusEffectDisabled().focused($focused)
+        .onPasteCommand(of: Fridge.dropTypes) { _ in fridge.paste() }
         .onAppear { fridge.refresh() }
     }
 
@@ -317,7 +358,7 @@ struct FridgeCard: View {
         VStack(spacing: 3) {
             if w >= 200 { Image(systemName: "tray.and.arrow.down").font(.title3) }
             Text("Drop files here").font(.callout.weight(.semibold))
-            if w >= 200 { Text("Screenshots, PDFs, notes. Up to \(Fridge.limit).").font(.caption).foregroundStyle(Self.soft) }
+            if w >= 200 { Text("Or click here and paste (⌘V). Up to \(Fridge.limit).").font(.caption).foregroundStyle(Self.soft) }
         }
         .foregroundStyle(Self.ink).multilineTextAlignment(.center)
         .padding(.horizontal, 12).padding(.vertical, 10)
@@ -369,7 +410,6 @@ struct FridgeCard: View {
         .background(barTargeted ? AnyShapeStyle(Color(nsColor: Tone.hex(0x0A64D8))) : AnyShapeStyle(Color.white.opacity(0.8)), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(barTargeted ? .white.opacity(0.6) : Color(nsColor: Tone.hex(0x0A64D8)).opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [5, 3])))
         .padding(10)
-        .onDrop(of: Fridge.dropTypes, isTargeted: $barTargeted) { fridge.drop($0, keep: true); return true }
     }
 
     /// "invoice.pdf slid off · Undo", or why a drop was refused.
@@ -392,6 +432,24 @@ struct FridgeCard: View {
                 .background(.white.opacity(0.92), in: Capsule()).shadow(color: .black.opacity(0.15), radius: 4, y: 1)
                 .padding(.bottom, 12).frame(maxWidth: .infinity)
         }
+    }
+}
+
+/// Dropping onto the card. Anything dropped on the bottom strip (the Keep bar) is kept straight away.
+struct FridgeDrop: DropDelegate {
+    let fridge: Fridge, keepFrom: CGFloat
+    @Binding var targeted: Bool
+    @Binding var overBar: Bool
+
+    func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: Fridge.dropTypes) }
+    func dropEntered(info: DropInfo) { targeted = true; overBar = info.location.y >= keepFrom }
+    func dropUpdated(info: DropInfo) -> DropProposal? { overBar = info.location.y >= keepFrom; return DropProposal(operation: .copy) }
+    func dropExited(info: DropInfo) { targeted = false; overBar = false }
+    func performDrop(info: DropInfo) -> Bool {
+        let keep = info.location.y >= keepFrom
+        targeted = false; overBar = false
+        fridge.drop(info.itemProviders(for: Fridge.dropTypes), keep: keep)
+        return true
     }
 }
 
