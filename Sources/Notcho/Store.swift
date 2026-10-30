@@ -1,6 +1,7 @@
 import AppKit
 import EventKit
 import Observation
+import SwiftUI
 
 struct TaskItem: Codable, Identifiable, Equatable {
     var id = UUID()
@@ -53,9 +54,12 @@ struct Objective: Codable, Identifiable, Equatable {
 }
 
 /// The Monday that starts the week containing `date`.
-func weekKey(_ date: Date) -> String {
+func weekKey(_ date: Date) -> String { isoDay(of: weekStart(date)) }
+
+/// Midnight on the Monday that starts the week containing `date`.
+func weekStart(_ date: Date) -> Date {
     var cal = Calendar(identifier: .gregorian); cal.firstWeekday = 2; cal.timeZone = .current
-    return isoDay(of: cal.dateInterval(of: .weekOfYear, for: date)!.start)
+    return cal.dateInterval(of: .weekOfYear, for: date)!.start
 }
 
 struct FocusEntry: Codable, Equatable {
@@ -90,6 +94,7 @@ enum FocusPhase: String, Codable { case ready, running, paused, finished }
     // Calendar (not saved)
     @ObservationIgnored let eventStore = EKEventStore()
     var events: [EKEvent] = []
+    var weekEvents: [EKEvent] = []   // this week and next, for Events → Week
     var calendarAccess = false
     var notificationsOn = false
     var syncStatus = ""
@@ -104,6 +109,8 @@ enum FocusPhase: String, Codable { case ready, running, paused, finished }
         var projects: [Project]?
         var objectives: [Objective]?
     }
+    /// True when `data` (a store.json) still loads; the selftest checks the real file after every change.
+    static func loads(_ data: Data) -> Bool { (try? JSONDecoder().decode(Saved.self, from: data)) != nil }
     private static let legacyKey = "store.v1"   // pre-Phase-4 home, left in place as a backup
     static let fileURL = URL.applicationSupportDirectory.appending(path: "Notcho/store.json")
     @ObservationIgnored private var pendingSave: DispatchWorkItem?
@@ -492,8 +499,32 @@ enum FocusPhase: String, Codable { case ready, running, paused, finished }
         let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
         events = eventStore.events(matching: eventStore.predicateForEvents(withStart: start, end: end, calendars: nil))
             .filter { $0.status != .canceled }.sorted { $0.startDate < $1.startDate }
+        let monday = weekStart(start)
+        weekEvents = eventStore.events(matching: eventStore.predicateForEvents(withStart: monday, end: Calendar.current.date(byAdding: .day, value: 14, to: monday)!, calendars: nil))
+            .filter { $0.status != .canceled }
         Store.saveEvents(events) // for `notch today`
         Timebox.exportCalendar(eventStore) // for agents: read_day
+    }
+}
+
+extension Store {
+    /// This week (Mon–Sun) and next, each day with its events and planned tasks, plus today's index (0 = Monday).
+    /// Time blocks are left out of the events: their tasks already stand for them.
+    func week() -> (days: [WeekDay], today: Int) {
+        let cal = Calendar.current, monday = weekStart(today), h = settings.dayStartHour
+        let blocks = Set(tasks.compactMap(\.blockID))
+        let days = (0..<14).map { i -> WeekDay in
+            let d = cal.date(byAdding: .day, value: i, to: monday)!, next = cal.date(byAdding: .day, value: 1, to: d)!
+            let evs = weekEvents.filter { !blocks.contains($0.eventIdentifier ?? "") && $0.startDate < next && $0.endDate > d }.map {
+                WeekItem(start: $0.isAllDay ? nil : $0.startDate, title: $0.title ?? "Untitled", event: true,
+                         minutes: $0.isAllDay ? nil : Int($0.endDate.timeIntervalSince($0.startDate) / 60), allDay: $0.isAllDay, color: Color(cgColor: $0.calendar.cgColor))
+            }
+            let ts = tasks.filter { $0.dismissedAt == nil && $0.someday != true && $0.planDayOf(startHour: h) == d }.map {
+                WeekItem(start: $0.startTime, title: $0.title, event: false, done: $0.done, minutes: $0.timeLimit)
+            }
+            return WeekDay(date: d, items: WeekLayout.sorted(evs + ts))
+        }
+        return (days, max(0, cal.dateComponents([.day], from: monday, to: today).day ?? 0))
     }
 }
 

@@ -81,6 +81,7 @@ struct Settings: Codable, Equatable {
     var timerClick = TimerClick.pause  // clicking the clock on the task already being timed
     var timerMenu = true        // right-click the menu-bar timer: Pause/Resume, Restart, Stop
     var timerHoverStop = false  // hovering a paused menu-bar timer shows ✕ (off: don't make quitting easy)
+    var eventsWeek = false      // Events card shows the whole week instead of today
 
     init() {}
 
@@ -113,6 +114,7 @@ struct Settings: Codable, Equatable {
         timerClick = (try? c.decodeIfPresent(TimerClick.self, forKey: .timerClick)) ?? d.timerClick
         timerMenu = (try? c.decodeIfPresent(Bool.self, forKey: .timerMenu)) ?? d.timerMenu
         timerHoverStop = (try? c.decodeIfPresent(Bool.self, forKey: .timerHoverStop)) ?? d.timerHoverStop
+        eventsWeek = (try? c.decodeIfPresent(Bool.self, forKey: .eventsWeek)) ?? d.eventsWeek
     }
 
     /// Saved order plus any card kinds added since it was saved.

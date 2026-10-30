@@ -473,6 +473,36 @@ if CommandLine.arguments.contains("--selftest") {
     precondition(abs(lay.weight(.focus) - 0.14) < 1e-9 && abs(lay.weight(.tasks) - 0.41) < 1e-9)
     lay.panelHeight = 500; lay.resetLayout()
     precondition(lay.cardWeights.isEmpty && lay.panelHeight == Double(Metrics.panelHeight))
+    // Saved data from before a change still loads; settings saved without a newer field take its default
+    if let data = try? Data(contentsOf: Store.fileURL) { precondition(Store.loads(data), "store.json no longer loads") }
+    let oldSettings = try! JSONDecoder().decode(Settings.self, from: Data(#"{"timerMenu":false}"#.utf8))
+    precondition(oldSettings.eventsWeek == false && oldSettings.timerMenu == false)
+    // Events → Week: sorting, the now line, folding past days, "+ N more", columns
+    let wk = cal.date(from: DateComponents(year: 2026, month: 10, day: 26))! // a Monday
+    func at(_ d: Int, _ h: Int) -> Date { cal.date(byAdding: .minute, value: d * 1440 + h * 60, to: wk)! }
+    var wdays = (0..<14).map { WeekDay(date: cal.date(byAdding: .day, value: $0, to: wk)!, items: []) }
+    wdays[0].items = [WeekItem(start: nil, title: "a", event: false, done: true), WeekItem(start: nil, title: "b", event: false, done: true)]
+    wdays[1].items = [WeekItem(start: at(1, 11), title: "c", event: false, done: true)]
+    wdays[3].items = WeekLayout.sorted([WeekItem(start: nil, title: "plan", event: false), WeekItem(start: at(3, 17), title: "five", event: true),
+                                        WeekItem(start: at(3, 14), title: "two", event: false, done: true), WeekItem(start: at(3, 15), title: "three", event: false),
+                                        WeekItem(start: nil, title: "holiday", event: true, allDay: true)])
+    precondition(wdays[3].items.map(\.title) == ["holiday", "two", "three", "five", "plan"])
+    wdays[4].items = [WeekItem(start: at(4, 10), title: "dentist", event: true)]
+    wdays[8].items = [WeekItem(start: nil, title: "ship", event: false)]
+    let now = at(3, 15) + 1800
+    let wl = WeekLayout.lines(wdays, today: 3, now: now, past: true, fold: true, foldRow: true, peek: false)
+    if case .fold = wl[0] {} else { preconditionFailure("past days should fold") }
+    let ni = wl.firstIndex(of: .now)!
+    if case let .item(i, _) = wl[ni - 1] { precondition(i.title == "three") } else { preconditionFailure("now line misplaced") }
+    let tall = WeekLayout.columns(wdays, today: 3, now: now, height: 1000, columns: 1, narrow: false, expanded: false)
+    precondition(tall.count == 1 && !tall[0].contains { if case .fold = $0 { true } else { false } } && !tall[0].contains { if case .more = $0 { true } else { false } })
+    let short = WeekLayout.columns(wdays, today: 3, now: now, height: 160, columns: 1, narrow: false, expanded: false)
+    precondition({ if case .fold = short[0][0] { true } else { false } }() && { if case .more = short[0].last! { true } else { false } }())
+    precondition(short[0].map(\.height).reduce(0, +) <= 160 && !short[0].last!.dangles)
+    let slim = WeekLayout.columns(wdays, today: 3, now: now, height: 120, columns: 1, narrow: true, expanded: false)
+    precondition(!slim[0].contains { if case .fold = $0 { true } else { false } })
+    let wide = WeekLayout.columns(wdays, today: 3, now: now, height: 200, columns: 2, narrow: false, expanded: false)
+    precondition(wide.count == 2 && wide.joined().contains(.nextWeek) && wide.allSatisfy { $0.map(\.height).reduce(0, +) <= 200 })
     print("selftest ok")
     exit(0)
 }
