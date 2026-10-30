@@ -387,10 +387,14 @@ struct WorkspaceView: View {
     func gap(_ l: CardKind, _ r: CardKind, height: CGFloat, perPoint: CGFloat) -> some View {
         // The grab area reaches 6 pt into each card's edge, so the thin gap is easy to hit.
         Color.clear.frame(width: Metrics.cardGap + 12, height: height).contentShape(Rectangle())
-            .overlay { Capsule().fill(.white.opacity(hoverGap == l ? 0.4 : 0)).frame(width: 3, height: 40) }
-            .onHover { inside in
-                hoverGap = inside ? l : (hoverGap == l ? nil : hoverGap)
-                if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+            // Always faintly visible, like the panel's edge handles, so people can tell the cards resize.
+            .overlay { Capsule().fill(.white.opacity(hoverGap == l ? 0.5 : 0.2)).frame(width: 4, height: 40) }
+            // Set on every move: the task list's scroll view keeps resetting the pointer to an arrow, so a one-time push flickers.
+            .onContinuousHover { phase in
+                switch phase {
+                case .active: if hoverGap != l { hoverGap = l }; NSCursor.resizeLeftRight.set()
+                case .ended: if hoverGap == l { hoverGap = nil }; if resizeStart == nil { NSCursor.arrow.set() }
+                }
             }
             .simultaneousGesture(TapGesture(count: 2).onEnded { // alongside the drag, so grabbing never waits on a double-click
                 let even = Double(store.settings.weight(l) + store.settings.weight(r)) / 2
