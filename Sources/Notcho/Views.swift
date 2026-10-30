@@ -41,6 +41,12 @@ enum Metrics {
     static let ear: CGFloat = 10           // NotchShape's top curves: the black body starts this far in from the window edge
     static let inset: CGFloat = 12         // black edge → cards, on the sides and the bottom
     static let minCard: CGFloat = 140
+    static let pagePopup: CGFloat = 112    // the folded Workspace · Insights · Customize button
+    static let pageTabs: CGFloat = 308     // the full tab bar plus ✕
+    /// Narrowest panel: the folded page button must fit beside the notch.
+    static func minPanelWidth(notch: CGFloat) -> CGFloat { notch + 2 * (ear + inset + pagePopup) }
+    /// True when `count` cards fit side by side in `width` at `minCard` each.
+    static func fits(_ count: Int, in width: CGFloat) -> Bool { CGFloat(count) * minCard + CGFloat(max(count - 1, 0)) * cardGap <= width }
     /// Narrowest panel that keeps `cards` cards at `minCard` each.
     static func minWidth(cards: Int) -> CGFloat {
         let n = CGFloat(max(cards, 1))
@@ -171,11 +177,15 @@ struct WorkspaceView: View {
     let close: () -> Void
     @FocusState private var field: Field?
 
+    @State private var deckCard: String?
+
     var body: some View {
+        // Black space beside the notch decides the top bar: full tabs, a folded button on the right, or on the left.
+        let beside = (model.workspace.width - model.collapsed.width) / 2 - (Metrics.ear + Metrics.inset)
         VStack(spacing: Metrics.cardGap) {
             HStack(spacing: 10) {
-                Spacer()
-                PagePicker(page: $model.page)
+                if beside < Metrics.pagePopup + 38 { pageMenu; Spacer() } else { Spacer() }
+                if beside >= Metrics.pageTabs { PagePicker(page: $model.page) } else if beside >= Metrics.pagePopup + 38 { pageMenu }
                 Button(action: close) {
                     Image(systemName: "xmark").font(.callout.weight(.bold)).foregroundStyle(.white)
                         .frame(width: 28, height: 28).background(.white.opacity(0.15), in: Circle())
@@ -187,27 +197,13 @@ struct WorkspaceView: View {
             switch model.page {
             case .workspace:
                 GeometryReader { geo in
-                    let cards = store.settings.visibleCards, weights = cards.map(store.settings.weight)
-                    let frames = cardFrames(weights, width: geo.size.width, gap: Metrics.cardGap)
-                    let perPoint = weights.reduce(0, +) / (geo.size.width - Metrics.cardGap * CGFloat(cards.count - 1))
-                    ZStack(alignment: .topLeading) {
-                        ForEach(Array(cards.enumerated()), id: \.element) { i, kind in
-                            let lifted = moving == kind
-                            card(kind)
-                                .frame(width: frames[i].width, height: geo.size.height)
-                                .scaleEffect(lifted ? 1.02 : 1)
-                                .shadow(color: .black.opacity(lifted ? 0.4 : 0), radius: 14, y: 6)
-                                .offset(x: frames[i].x + (lifted ? moveOffset : 0))
-                                .zIndex(lifted ? 1 : 0)
-                                .transaction { if lifted { $0.animation = nil } } // the lifted card follows the pointer exactly
-                                .environment(\.cardGrip) { grip(kind, $0, cards: cards, frames: frames) }
-                        }
-                        ForEach(cards.indices.dropLast(), id: \.self) { i in
-                            gap(cards[i], cards[i + 1], height: geo.size.height, perPoint: perPoint)
-                                .offset(x: frames[i].x + frames[i].width)
+                    let cards = store.settings.visibleCards
+                    if Metrics.fits(cards.count, in: geo.size.width) { sideBySide(cards, geo) } else {
+                        CompactDeck(style: store.settings.compactStyle, selected: $deckCard,
+                                    items: { now in cards.map { deckItem($0, now) } }) { id in
+                            if let kind = CardKind(rawValue: id) { card(kind) }
                         }
                     }
-                    .coordinateSpace(name: "cards")
                 }
             case .insights: InsightsView(store: store)
             case .customize: CustomizeView(store: store)
@@ -215,11 +211,78 @@ struct WorkspaceView: View {
         }
         // The black body starts `ear` in from the window edge (NotchShape's top curves); cards sit `inset` inside it on every side.
         .padding(.horizontal, Metrics.ear + Metrics.inset).padding(.top, 6).padding(.bottom, Metrics.inset)
-        .overlay(alignment: .bottom) { if model.page == .workspace { heightHandle } }
-        .overlay(alignment: .leading) { if model.page == .workspace { widthHandle(side: -1) } }
-        .overlay(alignment: .trailing) { if model.page == .workspace { widthHandle(side: 1) } }
+        .overlay(alignment: .bottom) { heightHandle }
+        .overlay(alignment: .leading) { widthHandle(side: -1) }
+        .overlay(alignment: .trailing) { widthHandle(side: 1) }
+        .overlay(alignment: .bottomLeading) { cornerHandle(side: -1) }
+        .overlay(alignment: .bottomTrailing) { cornerHandle(side: 1) }
         .onChange(of: field) { model.editing = field != nil }
         .onChange(of: model.expanded) { if !model.expanded { field = nil } }
+    }
+
+    /// Workspace · Insights · Customize folded into one pop-up when the tabs don't fit beside the notch.
+    var pageMenu: some View {
+        Menu {
+            ForEach(Page.allCases, id: \.self) { p in
+                Button { model.page = p } label: { if p == model.page { Label(p.rawValue, systemImage: "checkmark") } else { Text(p.rawValue) } }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text(model.page.rawValue).font(.callout.weight(.semibold))
+                Image(systemName: "chevron.up.chevron.down").font(.caption2.weight(.bold))
+            }
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .environment(\.colorScheme, .dark).foregroundStyle(.white)
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .background(.white.opacity(0.12), in: Capsule())
+        .frame(width: Metrics.pagePopup, alignment: .leading)
+        .accessibilityLabel("Page: \(model.page.rawValue)")
+    }
+
+    /// One card's button in the compact rail or chip row, with live info.
+    func deckItem(_ kind: CardKind, _ now: Date) -> DeckItem {
+        switch kind {
+        case .tasks:
+            let n = store.todo.count
+            return DeckItem(id: kind.rawValue, icon: kind.icon, tint: Tone.icon(kind), color: kind.color, title: "Tasks",
+                            info: "\(n)", badge: n > 0 ? "\(n)" : nil)
+        case .events:
+            let left = store.events.filter { !$0.isAllDay && $0.endDate > now }
+            return DeckItem(id: kind.rawValue, icon: kind.icon, tint: Tone.icon(kind), color: kind.color, title: "Events",
+                            info: left.first?.startDate.formatted(date: .omitted, time: .shortened), badge: left.isEmpty ? nil : "\(left.count)")
+        case .focus:
+            let on = store.focusState != .ready
+            return DeckItem(id: kind.rawValue, icon: kind.icon, tint: Tone.icon(kind), color: kind.color, title: "Focus",
+                            info: on ? clock(store.display(at: now)) : nil, live: store.focusState == .running)
+        case .notepad:
+            return DeckItem(id: kind.rawValue, icon: kind.icon, tint: Tone.icon(kind), color: kind.color, title: "Notepad")
+        }
+    }
+
+    /// The cards side by side, sized by their weights (the normal layout).
+    @ViewBuilder func sideBySide(_ cards: [CardKind], _ geo: GeometryProxy) -> some View {
+        let weights = cards.map(store.settings.weight)
+        let frames = cardFrames(weights, width: geo.size.width, gap: Metrics.cardGap)
+        let perPoint = weights.reduce(0, +) / (geo.size.width - Metrics.cardGap * CGFloat(cards.count - 1))
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(cards.enumerated()), id: \.element) { i, kind in
+                let lifted = moving == kind
+                card(kind)
+                    .frame(width: frames[i].width, height: geo.size.height)
+                    .scaleEffect(lifted ? 1.02 : 1)
+                    .shadow(color: .black.opacity(lifted ? 0.4 : 0), radius: 14, y: 6)
+                    .offset(x: frames[i].x + (lifted ? moveOffset : 0))
+                    .zIndex(lifted ? 1 : 0)
+                    .transaction { if lifted { $0.animation = nil } } // the lifted card follows the pointer exactly
+                    .environment(\.cardGrip) { grip(kind, $0, cards: cards, frames: frames) }
+            }
+            ForEach(cards.indices.dropLast(), id: \.self) { i in
+                gap(cards[i], cards[i + 1], height: geo.size.height, perPoint: perPoint)
+                    .offset(x: frames[i].x + frames[i].width)
+            }
+        }
+        .coordinateSpace(name: "cards")
     }
 
     // MARK: Moving and resizing
@@ -231,6 +294,7 @@ struct WorkspaceView: View {
     @State private var hoverGap: CardKind?
     @State private var heightStart: CGFloat?
     @State private var widthStart: (width: CGFloat, mouseX: CGFloat)?
+    @State private var cornerStart: (width: CGFloat, height: CGFloat, mouse: CGPoint)?
 
     /// Dot handle dragged: the card follows the pointer and swaps with a neighbor once it passes that neighbor's middle.
     func grip(_ kind: CardKind, _ v: DragGesture.Value?, cards: [CardKind], frames: [(x: CGFloat, width: CGFloat)]) {
@@ -307,6 +371,36 @@ struct WorkspaceView: View {
                 }
                 .onEnded { _ in widthStart = nil; model.dragging = false })
             .help("Drag to change the width · double-click to reset")
+    }
+
+    /// A bottom corner: drag to change width and height together; double-click for the default size.
+    func cornerHandle(side: CGFloat) -> some View {
+        Canvas { ctx, _ in
+            // Sits in the ring between the card corner (18) and the panel corner (30), which share a center.
+            var p = Path()
+            p.addArc(center: CGPoint(x: 30, y: -2), radius: 24, startAngle: .degrees(118), endAngle: .degrees(152), clockwise: false)
+            ctx.stroke(p, with: .color(.white.opacity(cornerStart != nil ? 0.5 : 0.2)), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+        }
+        .frame(width: 28, height: 28).scaleEffect(x: side, y: 1).contentShape(Rectangle())
+        .padding(side < 0 ? .leading : .trailing, Metrics.ear)
+        .onHover { inside in
+            guard inside else { NSCursor.pop(); return }
+            if #available(macOS 15, *) { NSCursor.frameResize(position: side < 0 ? .bottomLeft : .bottomRight, directions: .all).push() }
+            else { NSCursor.crosshair.push() }
+        }
+        .onTapGesture(count: 2) { model.setWidth(Metrics.panelWidth); model.setHeight(Metrics.panelHeight) }
+        .gesture(DragGesture(minimumDistance: 1)
+            .onChanged { _ in
+                let m = NSEvent.mouseLocation
+                if cornerStart == nil {
+                    cornerStart = (CGFloat(store.settings.panelWidth), CGFloat(store.settings.panelHeight), m); model.dragging = true
+                }
+                let s = cornerStart!
+                model.setWidth(s.width + 2 * side * (m.x - s.mouse.x))
+                model.setHeight(s.height + (s.mouse.y - m.y)) // screen y grows upward; the panel hangs from the top
+            }
+            .onEnded { _ in cornerStart = nil; model.dragging = false })
+        .help("Drag to resize · double-click to reset")
     }
 
     @ViewBuilder func card(_ kind: CardKind) -> some View {
@@ -742,13 +836,20 @@ struct FocusCard: View {
     var body: some View {
         Card(color: Tone.focus) {
             CardHeader(icon: "timer", title: "Focus", tint: Tone.icon(.focus))
-            // Minutes over seconds, as big as the card allows.
+            // Minutes over seconds when the card is tall; one line ("18:12") when it's short. Whichever gives bigger dots.
             TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
-                let parts = clock(store.display(at: ctx.date)).split(separator: ":").map(String.init)
+                let text = clock(store.display(at: ctx.date))
                 GeometryReader { g in
-                    let dot = max(2, min(g.size.width / 17, g.size.height / 22))
-                    VStack(spacing: dot * 1.5) {
-                        ForEach(parts.indices, id: \.self) { DotMatrix(text: parts[$0], dot: dot, color: Tone.timer) }
+                    let line = max(2, min(g.size.width / 37, g.size.height / 10.5))  // 25 columns, 7 rows
+                    let stack = max(2, min(g.size.width / 17, g.size.height / 22))  // 11 columns, 2 × 7 rows
+                    Group {
+                        if stack >= line {
+                            VStack(spacing: stack * 1.5) {
+                                ForEach(Array(text.split(separator: ":").enumerated()), id: \.offset) { DotMatrix(text: String($0.element), dot: stack, color: Tone.timer) }
+                            }
+                        } else {
+                            DotMatrix(text: text, dot: line, color: Tone.timer)
+                        }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -991,5 +1092,78 @@ struct EventsCard: View {
             }
             .fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+// MARK: - Compact deck: one card at a time
+
+struct DeckItem: Identifiable {
+    let id: String, icon: String, tint: Color, color: Color, title: String
+    var info: String? = nil, badge: String? = nil, live = false
+}
+
+/// When a page's cards don't fit side by side, it shows one at a time, picked from an icon rail
+/// (badges for what's waiting) or a row of live chips (Customize → Compact layout).
+struct CompactDeck<Content: View>: View {
+    let style: CompactStyle
+    @Binding var selected: String?
+    let items: (Date) -> [DeckItem]
+    @ViewBuilder let content: (String) -> Content
+
+    var body: some View {
+        let ids = items(.now).map(\.id)
+        let current = ids.contains(selected ?? "") ? selected! : ids.first ?? ""
+        let picker = TimelineView(.periodic(from: .now, by: 1)) { ctx in
+            let list = items(ctx.date)
+            if style == .rail {
+                VStack(spacing: 6) { ForEach(list) { rail($0, on: $0.id == current) }; Spacer(minLength: 0) }
+            } else {
+                HStack(spacing: 6) { ForEach(list) { chip($0, on: $0.id == current) } }
+            }
+        }
+        if style == .rail {
+            HStack(spacing: 10) { picker.frame(width: 40); content(current).frame(maxWidth: .infinity, maxHeight: .infinity) }
+        } else {
+            VStack(spacing: 10) { picker; content(current).frame(maxWidth: .infinity, maxHeight: .infinity) }
+        }
+    }
+
+    func rail(_ i: DeckItem, on: Bool) -> some View {
+        Button { selected = i.id } label: {
+            Image(systemName: i.icon).font(.title3.weight(.semibold)).foregroundStyle(on ? i.tint : .white.opacity(0.75))
+                .frame(width: 40, height: 40)
+                .background(on ? AnyShapeStyle(i.color) : AnyShapeStyle(.white.opacity(0.08)), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(alignment: .topTrailing) {
+                    if let b = i.badge {
+                        Text(b).font(.caption2.weight(.bold)).monospacedDigit().foregroundStyle(.white)
+                            .padding(.horizontal, 5).padding(.vertical, 1).background(Color(nsColor: Tone.hex(0x0A64D8)), in: Capsule())
+                            .offset(x: 5, y: -5)
+                    } else if i.live {
+                        Circle().fill(Color(nsColor: Tone.hex(0x34C759))).frame(width: 9, height: 9).offset(x: 2, y: -2)
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).help(i.title)
+        .accessibilityLabel([i.title, i.badge.map { "\($0) waiting" }, i.live ? "running" : nil].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    func chip(_ i: DeckItem, on: Bool) -> some View {
+        Button { selected = i.id } label: {
+            HStack(spacing: 5) {
+                Image(systemName: i.icon).font(.callout.weight(.semibold)).foregroundStyle(on ? i.tint : .white.opacity(0.8))
+                if on { Text(i.title).font(.callout.weight(.semibold)).lineLimit(1) }
+                if let info = i.info { Text(info).font(.callout).monospacedDigit().lineLimit(1).opacity(on ? 0.7 : 0.9) }
+            }
+            .foregroundStyle(on ? Tone.ink : .white)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .frame(maxWidth: on ? .infinity : nil)
+            .background(on ? AnyShapeStyle(i.color) : AnyShapeStyle(.white.opacity(0.10)), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain).help(i.title)
+        .accessibilityLabel([i.title, i.info].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }

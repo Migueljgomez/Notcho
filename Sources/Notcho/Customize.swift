@@ -6,14 +6,29 @@ struct CustomizeView: View {
     @Bindable var store: Store
     @State private var loginOn = LoginItem.enabled
     @State private var loginError: String?
+    @State private var deck: String?
 
     var body: some View {
         GeometryReader { geo in
             let w = (geo.size.width - 2 * Metrics.cardGap) / 3
-            HStack(spacing: Metrics.cardGap) {
-                general.frame(width: w)
-                focus.frame(width: w)
-                workspace
+            if Metrics.fits(3, in: geo.size.width) {
+                HStack(spacing: Metrics.cardGap) {
+                    general.frame(width: w)
+                    focus.frame(width: w)
+                    workspace
+                }
+            } else {
+                CompactDeck(style: store.settings.compactStyle, selected: $deck, items: { _ in [
+                    DeckItem(id: "general", icon: "slider.horizontal.3", tint: Tone.icon(.tasks), color: Tone.tasks, title: "General"),
+                    DeckItem(id: "focus", icon: "timer", tint: Tone.icon(.focus), color: Tone.focus, title: "Focus"),
+                    DeckItem(id: "workspace", icon: "square.grid.2x2", tint: Tone.icon(.events), color: Tone.events, title: "Workspace"),
+                ] }) { id in
+                    switch id {
+                    case "focus": focus
+                    case "workspace": workspace
+                    default: general
+                    }
+                }
             }
         }
     }
@@ -27,6 +42,13 @@ struct CustomizeView: View {
                 row("Launch at login") {
                     Toggle("", isOn: Binding(get: { loginOn }, set: { loginError = LoginItem.set($0); loginOn = LoginItem.enabled }))
                         .toggleStyle(.switch).labelsHidden()
+                }
+                row("When narrow") {
+                    Picker("", selection: $store.settings.compactStyle) {
+                        ForEach(CompactStyle.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .labelsHidden().fixedSize()
+                    .help("How a page shows one card at a time when the notch is too narrow for all of them")
                 }
                 row("Open shortcut") {
                     Picker("", selection: $store.settings.shortcut) {
@@ -336,6 +358,13 @@ struct WorkspaceSettings: View {
                     }
                     .pickerStyle(.segmented).labelsHidden()
                     Text("Light uses the Planner's colors; Pastel colors each card. Match my Mac: Light in Light mode, the dark island in Dark mode.").font(.callout).foregroundStyle(Palette.pInkSoft)
+                    Text("WHEN NARROW").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft).padding(.top, 6)
+                    Picker("", selection: $store.settings.compactStyle) {
+                        ForEach(CompactStyle.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    Text("If the cards don't fit side by side, each page shows one at a time. Icon rail: card icons on the left with badges. Live chips: a row above with live info.")
+                        .font(.callout).foregroundStyle(Palette.pInkSoft).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))
 
@@ -347,7 +376,7 @@ struct WorkspaceSettings: View {
                     }
                     Text("PANEL WIDTH").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft).padding(.top, 6)
                     HStack {
-                        let lo = Double(Metrics.minWidth(cards: store.settings.visibleCards.count))
+                        let lo = Double(Metrics.minPanelWidth(notch: 200))
                         let hi = max(Double((NSScreen.main?.frame.width ?? 1440) - 32), lo + 10)
                         Slider(value: Binding(get: { min(max(store.settings.panelWidth, lo), hi) }, set: { store.settings.panelWidth = $0 }),
                                in: lo...hi, step: 10)

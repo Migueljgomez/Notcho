@@ -62,7 +62,7 @@ final class NotchController {
         }
         model.setWidth = { [weak self] w in
             guard let self, let screen = panel.screen ?? NSScreen.main else { return }
-            let lo = Metrics.minWidth(cards: store.settings.visibleCards.count)
+            let lo = Metrics.minPanelWidth(notch: notch.width) // narrower than all cards is fine: pages go one card at a time
             store.settings.panelWidth = Double(min(max(w, lo), max(screen.frame.width - 32, lo)))
             layout()
         }
@@ -273,6 +273,8 @@ if CommandLine.arguments.contains("--selftest") {
     let narrow = NotchLayout.workspaceFrame(screen: screen, width: 700)
     precondition(narrow.width == 700 && narrow.midX == screen.midX) // resized panels stay centred under the notch
     precondition(Metrics.minWidth(cards: 4) == 640 && Metrics.minWidth(cards: 1) == 184) // 4×140 + 3×12 gaps + 2×22 sides
+    precondition(Metrics.fits(4, in: 596) && !Metrics.fits(4, in: 595) && Metrics.fits(1, in: 140))
+    precondition(Metrics.minPanelWidth(notch: 200) == 468) // the folded page button fits beside the notch
     let p = NotchLayout.pillFrame(notch: n)
     precondition(p.minX == n.maxX + 6 && p.midY == n.midY && p.height == 28)
     precondition(clock(1500) == "25:00" && clock(59.2) == "01:00" && clock(0) == "00:00")

@@ -28,6 +28,8 @@ enum PlannerLook: String, Codable, CaseIterable { case system = "Match my Mac", 
 
 enum SelectionStyle: String, Codable, CaseIterable { case accent = "Mac accent color", gray = "Soft gray", butter = "Pale butter" }
 
+enum CompactStyle: String, Codable, CaseIterable { case rail = "Icon rail", chips = "Live chips" }
+
 enum Unfinished: String, Codable, CaseIterable { case ask = "Ask me", carry = "Move to today", leave = "Leave in history" }
 
 enum TimerClick: String, Codable, CaseIterable { case pause = "Pause / Resume", restart = "Restart timer" }
@@ -70,6 +72,7 @@ struct Settings: Codable, Equatable {
     var plannerSelection = SelectionStyle.accent  // the selected sidebar row in the Planner
     var cardColors: [CardKind: Int] = [:]  // custom pastel per card (hex); missing = the default
     var showSubtasks = true
+    var compactStyle = CompactStyle.rail  // how a page shows one card at a time when the notch is too narrow
     var holdToComplete = true   // Focus ✓ needs a press-and-hold
     var timerClick = TimerClick.pause  // clicking the clock on the task already being timed
 
@@ -99,6 +102,7 @@ struct Settings: Codable, Equatable {
         plannerSelection = (try? c.decodeIfPresent(SelectionStyle.self, forKey: .plannerSelection)) ?? d.plannerSelection
         cardColors = (try? c.decodeIfPresent([CardKind: Int].self, forKey: .cardColors)) ?? d.cardColors
         showSubtasks = (try? c.decodeIfPresent(Bool.self, forKey: .showSubtasks)) ?? d.showSubtasks
+        compactStyle = (try? c.decodeIfPresent(CompactStyle.self, forKey: .compactStyle)) ?? d.compactStyle
         holdToComplete = (try? c.decodeIfPresent(Bool.self, forKey: .holdToComplete)) ?? d.holdToComplete
         timerClick = (try? c.decodeIfPresent(TimerClick.self, forKey: .timerClick)) ?? d.timerClick
     }

@@ -89,14 +89,24 @@ struct InsightsView: View {
     let store: Store
     @State private var metric = 0          // 0 = Tasks, 1 = Focus
     @State private var selected: Date?
+    @State private var deck: String?
 
     var body: some View {
         let s = Insights.compute(tasks: store.tasks, focusLog: store.focusLog,
                                  weekendsInStreak: store.settings.weekendsInStreak, dayStartHour: store.settings.dayStartHour)
         GeometryReader { geo in
-            HStack(spacing: Metrics.cardGap) {
-                summary(s).frame(width: (geo.size.width - Metrics.cardGap) * 0.32)
-                chartCard(s)
+            if Metrics.fits(2, in: geo.size.width) {
+                HStack(spacing: Metrics.cardGap) {
+                    summary(s).frame(width: (geo.size.width - Metrics.cardGap) * 0.32)
+                    chartCard(s)
+                }
+            } else {
+                CompactDeck(style: store.settings.compactStyle, selected: $deck, items: { _ in [
+                    DeckItem(id: "summary", icon: "checkmark.circle", tint: Tone.icon(.tasks), color: Tone.tasks, title: "Summary", info: "\(s.completed)"),
+                    DeckItem(id: "chart", icon: "chart.bar", tint: Tone.icon(.focus), color: Tone.focus, title: "Chart"),
+                ] }) { id in
+                    if id == "chart" { chartCard(s) } else { summary(s) }
+                }
             }
         }
     }
