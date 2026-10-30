@@ -61,8 +61,11 @@ final class NotchController {
         }
         model.applyLook = { [weak self] in
             guard let self else { return }
-            panel.appearance = switch store.settings.notchLook {
-            case .pastel: NSAppearance(named: .aqua)
+            let look = store.settings.notchLook
+            Tone.lightLook = look == .light || look == .system
+            panel.appearance = NSAppearance(named: .darkAqua) // a change makes the panel re-resolve its colors
+            panel.appearance = switch look {
+            case .light, .pastel: NSAppearance(named: .aqua)
             case .dark: NSAppearance(named: .darkAqua)
             case .system: nil // follows the Mac
             }

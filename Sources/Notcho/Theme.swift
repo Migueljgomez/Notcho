@@ -44,7 +44,7 @@ enum Tone {
     /// Card pastels: the user's pick (Planner → Workspace → Card colors) or the default. Dark island cards stay dark.
     static var custom: [CardKind: Int] = [:]
     static let defaults: [CardKind: Int] = [.tasks: 0xD3EBD7, .focus: 0xD2E2F6, .notepad: 0xF7E9AE, .events: 0xE2D7F2]
-    static func card(_ kind: CardKind) -> Color { pair(custom[kind] ?? defaults[kind]!, 0x1C1C1E) }
+    static func card(_ kind: CardKind) -> Color { pair(custom[kind] ?? defaults[kind]!, 0x1C1C1E, light: 0xF5F5F7) }
     /// Pastels that keep every card's text at 4.5:1 or better, highlights included.
     static let swatches = [0xD3EBD7, 0xD2E2F6, 0xF7E9AE, 0xE2D7F2, 0xF6D5D5, 0xF9DFC4, 0xD5EDEB, 0xE6E3DC]
     /// Secondary text (`inkSoft`) on the card's highlight (`wash`) is the weakest pair; it needs 4.5:1.
@@ -60,30 +60,42 @@ enum Tone {
         let bg = lum(washed[0] << 16 | washed[1] << 8 | washed[2])
         return (bg + 0.05) / (lum(0x4A4A4F) + 0.05) >= 4.5
     }
-    static let ink = pair(0x1C1C1E, 0xF5F5F7)
+    static let ink = pair(0x1C1C1E, 0xF5F5F7, light: 0x1D1D1F)
     // Secondary text and the tints below stay at 4.5:1 or better on every card color and on `wash`; Increase Contrast pushes them further.
-    static let inkSoft = pair(hex(0x4A4A4F), hex(0x98989F), contrast: (hex(0x2C2C2E), hex(0xD1D1D6)))
+    static let inkSoft = pair(hex(0x4A4A4F), hex(0x98989F), light: hex(0x636366), contrast: (hex(0x2C2C2E), hex(0xD1D1D6)))
     /// A slightly darker version of whatever card color is underneath: highlights, fields, tiles.
-    static let wash = pair(NSColor.black.withAlphaComponent(0.09), NSColor.white.withAlphaComponent(0.08),
+    static let wash = pair(NSColor.black.withAlphaComponent(0.09), NSColor.white.withAlphaComponent(0.08), light: NSColor.black.withAlphaComponent(0.05),
                            contrast: (NSColor.black.withAlphaComponent(0.15), NSColor.white.withAlphaComponent(0.16)))
     /// Text and marks that mean something, dark enough to read on the pastels.
     static let warning = pair(0x7F3D00, 0xFF9F0A)   // over a time limit
     static let alert = pair(0x962018, 0xFF6961)     // overdue
     static let now = pair(0x0846A0, 0x64A8FF)       // happening now
-    static let raised = pair(NSColor.white.withAlphaComponent(0.55), NSColor.white.withAlphaComponent(0.14))
+    static let raised = pair(NSColor.white.withAlphaComponent(0.55), NSColor.white.withAlphaComponent(0.14), light: .white)
     static let button = pair(0x1C1C1E, 0xF2B33D)
     static let onButton = pair(0xFFFFFF, 0x1C1C1E)
-    static let timer = pair(0x1C1C1E, 0xF2B33D)
+    static let timer = pair(0x1C1C1E, 0xF2B33D, light: 0x1F6FD1)
+    /// The task being worked on: a darker shade of the card (Pastel, Dark island) or the Planner's blue (Light).
+    static let current = pair(NSColor.black.withAlphaComponent(0.09), NSColor.white.withAlphaComponent(0.08), light: hex(0x0A64D8).withAlphaComponent(0.11))
+    static let accent = pair(0x1C1C1E, 0xF5F5F7, light: 0x0A64D8)   // the current task's timer and ring
+    static let tile = pair(NSColor.black.withAlphaComponent(0.09), NSColor.white.withAlphaComponent(0.08), light: hex(0x6B4FC8).withAlphaComponent(0.10))
+    /// Card header icons: ink, except the Light look gives each card the Planner sidebar's color.
+    static func icon(_ kind: CardKind) -> Color {
+        let v: Int = switch kind { case .tasks: 0x248A3D; case .events: 0x6B4FC8; case .focus: 0x1F6FD1; case .notepad: 0x8A7400 }
+        return pair(0x1C1C1E, 0xF5F5F7, light: v)
+    }
 
-    static func pair(_ light: Int, _ dark: Int) -> Color { pair(hex(light), hex(dark)) }
+    static func pair(_ pastel: Int, _ dark: Int, light: Int? = nil) -> Color { pair(hex(pastel), hex(dark), light: light.map(hex)) }
     /// `contrast` replaces the pair while Increase Contrast is on. The panel forces aqua/darkAqua, so the setting is read directly.
-    static func pair(_ light: NSColor, _ dark: NSColor, contrast: (NSColor, NSColor)? = nil) -> Color {
+    /// `light` is the Light look (the Planner's colors on the black panel); without it, Light uses the pastel value.
+    static func pair(_ pastel: NSColor, _ dark: NSColor, light: NSColor? = nil, contrast: (NSColor, NSColor)? = nil) -> Color {
         Color(nsColor: NSColor(name: nil) {
             let isDark = $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             if let contrast, NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast { return isDark ? contrast.1 : contrast.0 }
-            return isDark ? dark : light
+            return isDark ? dark : (lightLook ? light ?? pastel : pastel)
         })
     }
+    /// True for the Light look (and Match my Mac, whose light side is Light); set by the notch controller.
+    static var lightLook = true
     static func hex(_ v: Int) -> NSColor {
         NSColor(srgbRed: CGFloat(v >> 16 & 0xFF) / 255, green: CGFloat(v >> 8 & 0xFF) / 255, blue: CGFloat(v & 0xFF) / 255, alpha: 1)
     }

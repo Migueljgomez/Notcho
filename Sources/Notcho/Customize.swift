@@ -22,7 +22,7 @@ struct CustomizeView: View {
 
     var general: some View {
         Card(color: Tone.tasks) {
-            CardHeader(icon: "slider.horizontal.3", title: "General")
+            CardHeader(icon: "slider.horizontal.3", title: "General", tint: Tone.icon(.tasks))
             ScrollView { VStack(spacing: Metrics.stack) {
                 row("Launch at login") {
                     Toggle("", isOn: Binding(get: { loginOn }, set: { loginError = LoginItem.set($0); loginOn = LoginItem.enabled }))
@@ -46,7 +46,7 @@ struct CustomizeView: View {
                     }
                     .labelsHidden().fixedSize()
                 }
-                .help("Match my Mac: pastel in Light mode, the dark island in Dark mode")
+                .help("Light: the Planner's colors. Pastel: colored cards. Match my Mac: Light in Light mode, the dark island in Dark mode")
                 Dotted()
                 Text("Your day").font(.body.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
                 row("Day starts at") {
@@ -133,7 +133,7 @@ struct CustomizeView: View {
 
     var focus: some View {
         Card(color: Tone.focus) {
-            CardHeader(icon: "timer", title: "Focus")
+            CardHeader(icon: "timer", title: "Focus", tint: Tone.icon(.focus))
             ScrollView { VStack(spacing: Metrics.stack) {
                 row("Default timer") {
                     Picker("", selection: Binding(get: { store.settings.stopwatch }, set: { on in
@@ -210,7 +210,7 @@ struct CustomizeView: View {
 
     var workspace: some View {
         Card(color: Tone.events) {
-            CardHeader(icon: "square.grid.2x2", title: "Customize workspace")
+            CardHeader(icon: "square.grid.2x2", title: "Customize workspace", tint: Tone.icon(.events))
             Text("Drag to reorder. Toggle to show or hide.").font(.callout).foregroundStyle(Tone.inkSoft)
             List {
                 ForEach(store.settings.orderedCards) { kind in
@@ -335,7 +335,7 @@ struct WorkspaceSettings: View {
                         ForEach(NotchLook.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented).labelsHidden()
-                    Text("Match my Mac: pastel in Light mode, the dark island in Dark mode.").font(.callout).foregroundStyle(Palette.pInkSoft)
+                    Text("Light uses the Planner's colors; Pastel colors each card. Match my Mac: Light in Light mode, the dark island in Dark mode.").font(.callout).foregroundStyle(Palette.pInkSoft)
                 }
                 .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))
 
@@ -351,7 +351,7 @@ struct WorkspaceSettings: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("CARD COLORS").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
                     ForEach(CardKind.allCases) { kind in CardColorRow(store: store, kind: kind) }
-                    Text("Used by the Pastel look, and by Match my Mac in Light mode. Dark island cards stay dark.")
+                    Text("Used by the Pastel look. Light uses the Planner's gray cards, and Dark island cards stay dark.")
                         .font(.callout).foregroundStyle(Palette.pInkSoft)
                 }
                 .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))

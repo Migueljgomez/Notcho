@@ -85,22 +85,21 @@ struct DotMatrix: View {
     ]
 
     var body: some View {
-        let glyphs = text.compactMap { Self.glyphs[$0] }
         let pitch = dot * 1.5
-        let cols = glyphs.reduce(0) { $0 + $1[0].count } + max(glyphs.count - 1, 0)
-        Canvas { ctx, _ in
-            var x: CGFloat = 0
-            for g in glyphs {
-                for (row, line) in g.enumerated() {
-                    for (col, bit) in line.enumerated() where bit == "1" {
-                        let r = CGRect(x: x + CGFloat(col) * pitch, y: CGFloat(row) * pitch, width: dot, height: dot)
-                        ctx.fill(Path(ellipseIn: r), with: .color(color))
-                    }
-                }
-                x += CGFloat(g[0].count + 1) * pitch
+        // Lay out every dot, then trim empty edge columns so the dots themselves center ("1" has a blank left column).
+        var cells: [(col: Int, row: Int)] = [], x = 0
+        for g in text.compactMap({ Self.glyphs[$0] }) {
+            for (row, line) in g.enumerated() { for (col, bit) in line.enumerated() where bit == "1" { cells.append((x + col, row)) } }
+            x += g[0].count + 1
+        }
+        let lo = cells.map(\.col).min() ?? 0, hi = cells.map(\.col).max() ?? 0
+        return Canvas { ctx, _ in
+            for c in cells {
+                let r = CGRect(x: CGFloat(c.col - lo) * pitch, y: CGFloat(c.row) * pitch, width: dot, height: dot)
+                ctx.fill(Path(ellipseIn: r), with: .color(color))
             }
         }
-        .frame(width: CGFloat(cols) * pitch - (pitch - dot), height: 7 * pitch - (pitch - dot))
+        .frame(width: CGFloat(hi - lo) * pitch + dot, height: 6 * pitch + dot)
         .accessibilityLabel(text)
     }
 }
@@ -116,6 +115,7 @@ struct RootView: View {
         let size = model.expanded ? model.workspace : model.collapsed
         ZStack(alignment: .topLeading) {
             WorkspaceView(model: model, store: store, close: close)
+                .id(store.settings.notchLook) // re-resolve every color when the look changes
                 .frame(width: model.workspace.width, height: model.workspace.height)
                 .opacity(model.expanded ? 1 : 0)
                 .animation(model.expanded ? .easeOut(duration: 0.12).delay(0.2) : .easeOut(duration: 0.08), value: model.expanded)
@@ -359,12 +359,13 @@ struct Placeholder: View {
 
 struct CardHeader: View {
     let icon: String?, title: String
+    var tint: Color = Tone.ink
     var body: some View {
         HStack(spacing: 6) {
             // Icons start on the card's 16 pt text line in a fixed 16 pt column, so every title starts at 38 pt.
             // square.and.pencil's pencil makes it draw 1 pt low and right of the others (measured): nudge it back.
             if let icon {
-                Image(systemName: icon).font(.title3.weight(.semibold))
+                Image(systemName: icon).font(.title3.weight(.semibold)).foregroundStyle(tint)
                     .offset(x: icon == "square.and.pencil" ? -1 : 0, y: icon == "square.and.pencil" ? -1 : 0)
                     .frame(width: 16, alignment: .leading)
             }
@@ -398,7 +399,7 @@ struct TasksCard: View {
     var body: some View {
         Card(color: Tone.tasks) {
             HStack {
-                CardHeader(icon: "checklist", title: "Today's tasks")
+                CardHeader(icon: "checklist", title: "Today's tasks", tint: Tone.icon(.tasks))
                 Spacer()
                 Text(Date.now.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
                     .font(.callout).foregroundStyle(Tone.inkSoft)
@@ -483,7 +484,7 @@ struct TasksCard: View {
         return TimelineView(.periodic(from: .now, by: 1)) { ctx in
             let goal = store.isStopwatch ? TimeInterval(store.focusMinutes * 60) : store.focusTotal
             let done = timing && goal > 0 ? min(1, store.spent(at: ctx.date) / goal) : 0
-            Image(systemName: "timer").font(.callout.weight(.semibold))
+            Image(systemName: "timer").font(.callout.weight(.semibold)).foregroundStyle(timing ? Tone.accent : Tone.ink)
                 .symbolEffect(.pulse, isActive: timing && store.focusState == .running && !reduceMotion)
                 .frame(width: 24, height: 24)
                 .overlay {
@@ -491,7 +492,7 @@ struct TasksCard: View {
                         Circle().stroke(Tone.ink.opacity(0.15), lineWidth: 2)
                     }
                     if timing {
-                        Circle().trim(from: 0, to: done).stroke(Tone.ink, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        Circle().trim(from: 0, to: done).stroke(Tone.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                             .rotationEffect(.degrees(-90))
                     }
                 }
@@ -581,7 +582,7 @@ struct TasksCard: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 8)
-        .background(isCurrent(task) ? Tone.wash : .clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(isCurrent(task) ? Tone.current : .clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .contentShape(Rectangle())
         .popover(isPresented: Binding(get: { limitTaskID == task.id }, set: { if !$0 { limitTaskID = nil } }), arrowEdge: .bottom) {
             SetTimeView(subtitle: task.title, initial: task.timeLimit ?? store.focusMinutes,
@@ -709,7 +710,7 @@ struct FocusCard: View {
 
     var body: some View {
         Card(color: Tone.focus) {
-            CardHeader(icon: "timer", title: "Focus")
+            CardHeader(icon: "timer", title: "Focus", tint: Tone.icon(.focus))
             // Minutes over seconds, as big as the card allows.
             TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
                 let parts = clock(store.display(at: ctx.date)).split(separator: ":").map(String.init)
@@ -822,7 +823,7 @@ struct NotepadCard: View {
 
     var body: some View {
         Card(color: Tone.notes) {
-            CardHeader(icon: "square.and.pencil", title: "Notepad")
+            CardHeader(icon: "square.and.pencil", title: "Notepad", tint: Tone.icon(.notepad))
             Text(Date.now.formatted(.dateTime.month(.abbreviated).day().year()))
                 .font(.callout).foregroundStyle(Tone.inkSoft)
             Rectangle().fill(Tone.ink.opacity(0.12)).frame(height: 1)
@@ -870,7 +871,7 @@ struct EventsCard: View {
     var body: some View {
         Card(color: Tone.events) {
             HStack {
-                CardHeader(icon: "calendar", title: "Events")
+                CardHeader(icon: "calendar", title: "Events", tint: Tone.icon(.events))
                 Spacer()
                 Menu {
                     Button("Open in Calendar") { NSWorkspace.shared.open(URL(string: "ical://")!) }
@@ -923,7 +924,7 @@ struct EventsCard: View {
 
     func tile<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         content().padding(8).frame(maxWidth: .infinity, alignment: .leading)
-            .background(Tone.wash, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(Tone.tile, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .padding(.horizontal, -8) // tile 8 pt from the card edge, its content on the 16 pt line
     }
 

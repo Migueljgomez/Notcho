@@ -22,7 +22,7 @@ func cardFrames(_ weights: [CGFloat], width: CGFloat, gap: CGFloat) -> [(x: CGFl
 }
 
 /// How the notch looks. Match my Mac: pastel in Light mode, the dark island in Dark mode.
-enum NotchLook: String, Codable, CaseIterable { case pastel = "Pastel", dark = "Dark island", system = "Match my Mac" }
+enum NotchLook: String, Codable, CaseIterable { case light = "Light", pastel = "Pastel", dark = "Dark island", system = "Match my Mac" }
 
 enum PlannerLook: String, Codable, CaseIterable { case system = "Match my Mac", light = "Light", dark = "Dark" }
 
@@ -64,7 +64,7 @@ struct Settings: Codable, Equatable {
     var panelHeight = Double(Metrics.panelHeight)
     var closeAfter = 0.0        // seconds the notch waits after the pointer leaves; `stayOpen` = only click-away, Esc or ✕
     static let stayOpen = 3.5
-    var notchLook = NotchLook.pastel
+    var notchLook = NotchLook.light
     var plannerLook = PlannerLook.system
     var plannerSelection = SelectionStyle.accent  // the selected sidebar row in the Planner
     var cardColors: [CardKind: Int] = [:]  // custom pastel per card (hex); missing = the default
