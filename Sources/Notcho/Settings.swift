@@ -9,6 +9,10 @@ enum CardKind: String, Codable, CaseIterable, Identifiable {
     var icon: String { ["checklist", "timer", "square.and.pencil", "calendar"][Self.allCases.firstIndex(of: self)!] }
     /// Relative width on the Workspace page.
     var weight: CGFloat { [0.36, 0.19, 0.2, 0.25][Self.allCases.firstIndex(of: self)!] }
+    /// Narrowest width before the card's titles and rows start to break (measured on the 16").
+    var comfort: CGFloat { [300, 160, 170, 210][Self.allCases.firstIndex(of: self)!] }
+    /// When space runs short, cards step aside in this order; Tasks goes last.
+    static let dropOrder: [CardKind] = [.notepad, .focus, .events, .tasks]
 }
 
 /// Where each visible card sits in a row `width` wide.

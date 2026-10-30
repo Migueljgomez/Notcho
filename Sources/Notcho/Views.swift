@@ -52,6 +52,17 @@ enum Metrics {
         let n = CGFloat(max(cards, 1))
         return n * minCard + (n - 1) * cardGap + 2 * (ear + inset)
     }
+    static let rail: CGFloat = 50          // the icon rail plus its gap
+    /// Which cards stay side by side in `width`, and which step aside into the rail or chips.
+    /// `pick` (a card clicked in the rail) is kept over the others, swapping out its neighbor.
+    static func arrange(_ cards: [CardKind], width: CGFloat, rail: Bool, pick: CardKind?) -> (shown: [CardKind], aside: [CardKind]) {
+        func need(_ c: [CardKind]) -> CGFloat { c.map(\.comfort).reduce(0, +) + CGFloat(max(c.count - 1, 0)) * cardGap }
+        if need(cards) <= width { return (cards, []) }
+        let room = width - (rail ? self.rail : 0)
+        var shown = cards
+        for c in CardKind.dropOrder where c != pick && shown.count > 1 && need(shown) > room { shown.removeAll { $0 == c } }
+        return (shown, cards.filter { !shown.contains($0) })
+    }
     static let cardGap: CGFloat = 12       // between cards, and header → cards
     static let cardPadding: CGFloat = 16   // card edge → content
     static let cardRadius = Theme.cardRadius
@@ -177,7 +188,7 @@ struct WorkspaceView: View {
     let close: () -> Void
     @FocusState private var field: Field?
 
-    @State private var deckCard: String?
+    @State private var pick: CardKind?
 
     var body: some View {
         // Black space beside the notch decides the top bar: full tabs, a folded button on the right, or on the left.
@@ -197,11 +208,12 @@ struct WorkspaceView: View {
             switch model.page {
             case .workspace:
                 GeometryReader { geo in
-                    let cards = store.settings.visibleCards
-                    if Metrics.fits(cards.count, in: geo.size.width) { sideBySide(cards, geo) } else {
-                        CompactDeck(style: store.settings.compactStyle, selected: $deckCard,
-                                    items: { now in cards.map { deckItem($0, now) } }) { id in
-                            if let kind = CardKind(rawValue: id) { card(kind) }
+                    let style = store.settings.compactStyle
+                    let (shown, aside) = Metrics.arrange(store.settings.visibleCards, width: geo.size.width, rail: style == .rail, pick: pick)
+                    if aside.isEmpty { sideBySide(shown, geo) } else {
+                        Aside(style: style, items: { now in aside.map { deckItem($0, now) } },
+                              pick: { id in withAnimation(.spring(response: 0.3, dampingFraction: 1)) { pick = CardKind(rawValue: id) } }) {
+                            GeometryReader { inner in sideBySide(shown, inner) }
                         }
                     }
                 }
@@ -1113,23 +1125,36 @@ struct CompactDeck<Content: View>: View {
     var body: some View {
         let ids = items(.now).map(\.id)
         let current = ids.contains(selected ?? "") ? selected! : ids.first ?? ""
+        Aside(style: style, current: current, items: items, pick: { selected = $0 }) { content(current) }
+    }
+}
+
+/// Content with an icon rail on its left or a chip row above it; clicking one calls `pick`.
+struct Aside<Content: View>: View {
+    let style: CompactStyle
+    var current: String? = nil
+    let items: (Date) -> [DeckItem]
+    let pick: (String) -> Void
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
         let picker = TimelineView(.periodic(from: .now, by: 1)) { ctx in
             let list = items(ctx.date)
             if style == .rail {
                 VStack(spacing: 6) { ForEach(list) { rail($0, on: $0.id == current) }; Spacer(minLength: 0) }
             } else {
-                HStack(spacing: 6) { ForEach(list) { chip($0, on: $0.id == current) } }
+                HStack(spacing: 6) { ForEach(list) { chip($0, on: $0.id == current) }; if current == nil { Spacer(minLength: 0) } }
             }
         }
         if style == .rail {
-            HStack(spacing: 10) { picker.frame(width: 40); content(current).frame(maxWidth: .infinity, maxHeight: .infinity) }
+            HStack(spacing: Metrics.rail - 40) { picker.frame(width: 40); content().frame(maxWidth: .infinity, maxHeight: .infinity) }
         } else {
-            VStack(spacing: 10) { picker; content(current).frame(maxWidth: .infinity, maxHeight: .infinity) }
+            VStack(spacing: 10) { picker; content().frame(maxWidth: .infinity, maxHeight: .infinity) }
         }
     }
 
     func rail(_ i: DeckItem, on: Bool) -> some View {
-        Button { selected = i.id } label: {
+        Button { pick(i.id) } label: {
             Image(systemName: i.icon).font(.title3.weight(.semibold)).foregroundStyle(on ? i.tint : .white.opacity(0.75))
                 .frame(width: 40, height: 40)
                 .background(on ? AnyShapeStyle(i.color) : AnyShapeStyle(.white.opacity(0.08)), in: RoundedRectangle(cornerRadius: 10))
@@ -1150,7 +1175,7 @@ struct CompactDeck<Content: View>: View {
     }
 
     func chip(_ i: DeckItem, on: Bool) -> some View {
-        Button { selected = i.id } label: {
+        Button { pick(i.id) } label: {
             HStack(spacing: 5) {
                 Image(systemName: i.icon).font(.callout.weight(.semibold)).foregroundStyle(on ? i.tint : .white.opacity(0.8))
                 if on { Text(i.title).font(.callout.weight(.semibold)).lineLimit(1) }

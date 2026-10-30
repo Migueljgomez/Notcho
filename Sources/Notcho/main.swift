@@ -275,6 +275,15 @@ if CommandLine.arguments.contains("--selftest") {
     precondition(Metrics.minWidth(cards: 4) == 640 && Metrics.minWidth(cards: 1) == 184) // 4×140 + 3×12 gaps + 2×22 sides
     precondition(Metrics.fits(4, in: 596) && !Metrics.fits(4, in: 595) && Metrics.fits(1, in: 140))
     precondition(Metrics.minPanelWidth(notch: 200) == 468) // the folded page button fits beside the notch
+    // Drop order: Notepad, then Focus, then Events step aside; Tasks stays. A picked card swaps in next to Tasks.
+    let all: [CardKind] = [.tasks, .focus, .notepad, .events]
+    precondition(Metrics.arrange(all, width: 896, rail: true, pick: nil).aside.isEmpty)      // 940 panel: all four fit
+    precondition(Metrics.arrange(all, width: 656, rail: true, pick: nil) == ([.tasks, .events], [.focus, .notepad])) // 700 panel
+    precondition(Metrics.arrange(all, width: 656, rail: false, pick: nil) == ([.tasks, .events], [.focus, .notepad]))
+    precondition(Metrics.arrange(all, width: 436, rail: true, pick: nil) == ([.tasks], [.focus, .notepad, .events])) // 480 panel
+    precondition(Metrics.arrange(all, width: 656, rail: true, pick: .notepad) == ([.tasks, .notepad], [.focus, .events]))
+    precondition(Metrics.arrange(all, width: 436, rail: true, pick: .focus) == ([.focus], [.tasks, .notepad, .events]))
+    precondition(Metrics.arrange(all, width: 760, rail: true, pick: nil) == ([.tasks, .focus, .events], [.notepad]))
     let p = NotchLayout.pillFrame(notch: n)
     precondition(p.minX == n.maxX + 6 && p.midY == n.midY && p.height == 28)
     precondition(clock(1500) == "25:00" && clock(59.2) == "01:00" && clock(0) == "00:00")
