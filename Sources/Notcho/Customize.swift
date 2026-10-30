@@ -187,6 +187,12 @@ struct CustomizeView: View {
                     }
                     .labelsHidden().fixedSize()
                 }
+                row("Timer right-click menu") {
+                    Toggle("", isOn: $store.settings.timerMenu).toggleStyle(.switch).labelsHidden()
+                }
+                row("Hover ✕ to stop paused timer") {
+                    Toggle("", isOn: $store.settings.timerHoverStop).toggleStyle(.switch).labelsHidden()
+                }
                 row("Completion sound") {
                     Toggle("", isOn: $store.settings.completionSound).toggleStyle(.switch).labelsHidden()
                 }

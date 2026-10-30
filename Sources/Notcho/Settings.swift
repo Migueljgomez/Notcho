@@ -79,6 +79,8 @@ struct Settings: Codable, Equatable {
     var compactStyle = CompactStyle.rail  // how a page shows one card at a time when the notch is too narrow
     var holdToComplete = true   // Focus ✓ needs a press-and-hold
     var timerClick = TimerClick.pause  // clicking the clock on the task already being timed
+    var timerMenu = true        // right-click the menu-bar timer: Pause/Resume, Restart, Stop
+    var timerHoverStop = false  // hovering a paused menu-bar timer shows ✕ (off: don't make quitting easy)
 
     init() {}
 
@@ -109,6 +111,8 @@ struct Settings: Codable, Equatable {
         compactStyle = (try? c.decodeIfPresent(CompactStyle.self, forKey: .compactStyle)) ?? d.compactStyle
         holdToComplete = (try? c.decodeIfPresent(Bool.self, forKey: .holdToComplete)) ?? d.holdToComplete
         timerClick = (try? c.decodeIfPresent(TimerClick.self, forKey: .timerClick)) ?? d.timerClick
+        timerMenu = (try? c.decodeIfPresent(Bool.self, forKey: .timerMenu)) ?? d.timerMenu
+        timerHoverStop = (try? c.decodeIfPresent(Bool.self, forKey: .timerHoverStop)) ?? d.timerHoverStop
     }
 
     /// Saved order plus any card kinds added since it was saved.

@@ -405,6 +405,23 @@ enum FocusPhase: String, Codable { case ready, running, paused, finished }
         focusRemaining = TimeInterval(focusMinutes * 60); focusTotal = focusRemaining
     }
 
+    /// Same session, from the top: the focused task's limit again (or the default).
+    func restart() {
+        if let id = focusTaskID { start(task: id) } else { endSession(); start() }
+    }
+
+    /// Lines shown when someone stops a timer early; `left` is the clock as it read.
+    static func quips(left: String) -> [String] {
+        ["Wow, quitter.", "Bold move.", "The timer will remember this.", "Fine. Be that way.", "\(left) of glory, gone.", "We'll call it a warm-up."]
+    }
+
+    /// Stops the timer from the menu bar and returns a cheeky goodbye.
+    func stopTimer() -> String {
+        let line = Self.quips(left: clock(display())).randomElement()!
+        endSession()
+        return line
+    }
+
     /// ✓ button: completes the focused task (if any) and ends the session.
     func completeFocus() {
         if let id = focusTaskID, let i = tasks.firstIndex(where: { $0.id == id }) {

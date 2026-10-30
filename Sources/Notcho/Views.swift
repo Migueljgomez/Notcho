@@ -18,6 +18,7 @@ enum Page: String, CaseIterable { case workspace = "Workspace", insights = "Insi
     var workspace = CGSize(width: 820, height: 330)
     var notchOffsetX: CGFloat = 0  // notch centre relative to panel centre
     var pill = CGRect(x: 0, y: 0, width: 90, height: 30) // relative to panel top-left
+    var quip: String?              // the goodbye shown where the timer was, for 2 s after Stop
 }
 
 // MARK: - Palette (flat, no paper texture)
@@ -152,29 +153,78 @@ struct RootView: View {
                 .frame(maxWidth: .infinity, alignment: .top)
 
             if store.focusState != .ready {
-                TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
-                    DotMatrix(text: clock(store.display(at: ctx.date)), dot: 1.9,
-                              color: .white.opacity(store.focusState == .paused ? 0.45 : 0.9)) // dim = paused
-                }
-                .frame(width: model.pill.width, height: model.pill.height)
-                .background(.black, in: Capsule())
-                .contentShape(Capsule())
-                .onTapGesture {
-                    switch store.focusState {
-                    case .running: store.pause()
-                    case .paused: store.start()
-                    default: break
-                    }
-                }
-                .accessibilityAddTraits(.isButton)
-                .accessibilityHint(store.focusState == .running ? "Pause" : "Resume")
-                .offset(x: model.pill.minX, y: model.pill.minY)
-                .opacity(model.expanded ? 0 : 1)
-                .animation(.easeOut(duration: 0.12), value: model.expanded)
+                TimerPill(model: model, store: store)
+                    .offset(x: model.pill.minX, y: model.pill.minY)
+                    .opacity(model.expanded ? 0 : 1)
+                    .animation(.easeOut(duration: 0.12), value: model.expanded)
+            } else if let quip = model.quip {
+                Text(quip).font(.callout.weight(.semibold)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.8)
+                    .padding(.horizontal, 12).frame(height: model.pill.height).background(.black, in: Capsule())
+                    .frame(maxWidth: model.workspace.width - model.pill.minX - 4, alignment: .leading).fixedSize(horizontal: true, vertical: false)
+                    .offset(x: model.pill.minX, y: model.pill.minY)
+                    .transition(.opacity.combined(with: .scale(scale: 0.6, anchor: .leading)))
+                    .allowsHitTesting(false)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onChange(of: store.settings.notchLook) { model.applyLook() }
+    }
+}
+
+/// The menu-bar timer beside the notch. Click: pause/resume. Right-click: Pause/Resume, Restart, Stop
+/// (Customize → Timer menu). Hovering a paused one can show ✕ (Customize → Hover ✕ to stop, off by default).
+struct TimerPill: View {
+    let model: NotchModel
+    let store: Store
+    @State private var hover = false
+
+    static let hoverWidth: CGFloat = 116
+
+    var body: some View {
+        let paused = store.focusState == .paused
+        let showX = paused && hover && store.settings.timerHoverStop
+        HStack(spacing: 8) {
+            TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
+                DotMatrix(text: clock(store.display(at: ctx.date)), dot: 1.9, color: .white.opacity(paused ? 0.45 : 0.9)) // dim = paused
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { store.focusState == .running ? store.pause() : store.start() }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(store.focusState == .running ? "Pause" : "Resume")
+            if showX {
+                Button(action: stop) {
+                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
+                        .frame(width: 18, height: 18).background(.white.opacity(0.22), in: Circle())
+                }
+                .buttonStyle(.plain).help("Stop timer").accessibilityLabel("Stop timer")
+            }
+        }
+        .frame(width: showX ? Self.hoverWidth : model.pill.width, height: model.pill.height)
+        .background(.black, in: Capsule())
+        .contentShape(Capsule())
+        .frame(width: Self.hoverWidth, alignment: .leading) // room to widen; the controller lets this area take the pointer
+        .onHover { hover = $0 }
+        .animation(.easeOut(duration: 0.15), value: showX)
+        .contextMenu {
+            if store.settings.timerMenu {
+                Button(paused ? "Resume" : "Pause", systemImage: paused ? "play.fill" : "pause.fill") { paused ? store.start() : store.pause() }
+                Button("Restart", systemImage: "arrow.counterclockwise") { store.restart() }
+                Divider()
+                Button("Stop timer", systemImage: "xmark", action: stop)
+            }
+        }
+    }
+
+    /// Ends the session and shows a cheeky goodbye where the timer was, for 2 seconds.
+    func stop() {
+        let line = store.stopTimer()
+        let anim: Animation? = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.9)
+        withAnimation(anim) { model.quip = line }
+        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested,
+                             userInfo: [.announcement: line, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            if model.quip == line { withAnimation(anim) { model.quip = nil } }
+        }
     }
 }
 

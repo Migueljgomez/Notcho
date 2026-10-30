@@ -205,7 +205,11 @@ final class NotchController {
     /// What the pointer can hit right now, in screen coordinates.
     var surfaces: [CGRect] {
         if model.expanded { return [workspace] }
-        return store.focusState == .ready ? [notch] : [notch, pill]
+        if store.focusState == .ready { return [notch] }
+        // A paused timer can widen to show ✕ when that's switched on.
+        var p = pill
+        if store.focusState == .paused && store.settings.timerHoverStop { p.size.width = TimerPill.hoverWidth }
+        return [notch, p]
     }
 
     func trackPointer() {
@@ -286,6 +290,7 @@ if CommandLine.arguments.contains("--selftest") {
     precondition(Metrics.arrange(all, width: 760, rail: true, pick: nil) == ([.tasks, .focus, .events], [.notepad]))
     let p = NotchLayout.pillFrame(notch: n)
     precondition(p.minX == n.maxX + 6 && p.midY == n.midY && p.height == 28)
+    precondition(Store.quips(left: "18:12").contains("18:12 of glory, gone.") && Store.quips(left: "").count == 6)
     precondition(clock(1500) == "25:00" && clock(59.2) == "01:00" && clock(0) == "00:00")
     precondition(wordCount("  the bee\nflies anyway ") == 4 && wordCount("") == 0)
     precondition(DotMatrix.glyphs.values.allSatisfy { $0.count == 7 && Set($0.map(\.count)).count == 1 })
