@@ -345,7 +345,7 @@ struct WorkspaceView: View {
             }
             ForEach(cards.indices.dropLast(), id: \.self) { i in
                 gap(cards[i], cards[i + 1], height: geo.size.height, perPoint: perPoint)
-                    .offset(x: frames[i].x + frames[i].width)
+                    .offset(x: frames[i].x + frames[i].width - 6)
             }
         }
         .coordinateSpace(name: "cards")
@@ -385,18 +385,19 @@ struct WorkspaceView: View {
 
     /// The space between two cards: drag to resize them, double-click to make them equal.
     func gap(_ l: CardKind, _ r: CardKind, height: CGFloat, perPoint: CGFloat) -> some View {
-        Color.clear.frame(width: Metrics.cardGap, height: height).contentShape(Rectangle())
+        // The grab area reaches 6 pt into each card's edge, so the thin gap is easy to hit.
+        Color.clear.frame(width: Metrics.cardGap + 12, height: height).contentShape(Rectangle())
             .overlay { Capsule().fill(.white.opacity(hoverGap == l ? 0.4 : 0)).frame(width: 3, height: 40) }
             .onHover { inside in
                 hoverGap = inside ? l : (hoverGap == l ? nil : hoverGap)
                 if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
             }
-            .onTapGesture(count: 2) {
+            .simultaneousGesture(TapGesture(count: 2).onEnded { // alongside the drag, so grabbing never waits on a double-click
                 let even = Double(store.settings.weight(l) + store.settings.weight(r)) / 2
                 withAnimation(.spring(response: 0.3, dampingFraction: 1)) {
                     store.settings.cardWeights[l] = even; store.settings.cardWeights[r] = even
                 }
-            }
+            })
             .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("cards"))
                 .onChanged { v in
                     if resizeStart == nil { resizeStart = (store.settings.weight(l), store.settings.weight(r)); model.dragging = true }
@@ -411,7 +412,7 @@ struct WorkspaceView: View {
         Capsule().fill(.white.opacity(heightStart != nil ? 0.5 : 0.2)).frame(width: 40, height: 4)
             .frame(width: 160, height: 14).contentShape(Rectangle())
             .onHover { if $0 { NSCursor.resizeUpDown.push() } else { NSCursor.pop() } }
-            .onTapGesture(count: 2) { model.setHeight(Metrics.panelHeight) }
+            .simultaneousGesture(TapGesture(count: 2).onEnded { model.setHeight(Metrics.panelHeight) }) // alongside the drag, so grabbing never waits on a double-click
             .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
                 .onChanged { v in
                     if heightStart == nil { heightStart = CGFloat(store.settings.panelHeight); model.dragging = true }
@@ -427,7 +428,7 @@ struct WorkspaceView: View {
             .frame(width: Metrics.inset, height: 160).contentShape(Rectangle())
             .padding(side < 0 ? .leading : .trailing, Metrics.ear) // in the black strip between the edge and the cards
             .onHover { if $0 { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
-            .onTapGesture(count: 2) { model.setWidth(Metrics.panelWidth) }
+            .simultaneousGesture(TapGesture(count: 2).onEnded { model.setWidth(Metrics.panelWidth) }) // alongside the drag, so grabbing never waits on a double-click
             // The window moves as it resizes, so measure the pointer on screen, not in the view.
             .gesture(DragGesture(minimumDistance: 1)
                 .onChanged { _ in
@@ -454,7 +455,7 @@ struct WorkspaceView: View {
             if #available(macOS 15, *) { NSCursor.frameResize(position: side < 0 ? .bottomLeft : .bottomRight, directions: .all).push() }
             else { NSCursor.crosshair.push() }
         }
-        .onTapGesture(count: 2) { model.setWidth(Metrics.panelWidth); model.setHeight(Metrics.panelHeight) }
+        .simultaneousGesture(TapGesture(count: 2).onEnded { model.setWidth(Metrics.panelWidth); model.setHeight(Metrics.panelHeight) }) // alongside the drag, so grabbing never waits on a double-click
         .gesture(DragGesture(minimumDistance: 1)
             .onChanged { _ in
                 let m = NSEvent.mouseLocation
