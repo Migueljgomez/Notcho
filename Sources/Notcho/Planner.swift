@@ -72,9 +72,39 @@ extension Palette {
     /// Secondary text at 4.5:1 or better on `cream` and `card`; darker still with Increase Contrast.
     static let pInkSoft = Tone.pair(Tone.hex(0x636366), Tone.hex(0xAEAEB2), contrast: (Tone.hex(0x3A3A3C), Tone.hex(0xD1D1D6)))
     static let pWash = dyn(.black.withAlphaComponent(0.06), .white.withAlphaComponent(0.1))
-    /// The selected sidebar row: a gold tint with dark-gold text.
-    static let selected = dyn(NSColor(srgbRed: 0.949, green: 0.702, blue: 0.239, alpha: 0.30), NSColor(srgbRed: 0.949, green: 0.702, blue: 0.239, alpha: 0.28))
-    static let selectedInk = dyn(Tone.hex(0x6B4300), Tone.hex(0xFFD27A))
+    /// The selected sidebar row (Planner → Customize → Selection color).
+    static func selFill(_ s: SelectionStyle) -> Color {
+        switch s {
+        case .accent: Color(nsColor: .controlAccentColor)
+        case .gray: dyn(.black.withAlphaComponent(0.10), .white.withAlphaComponent(0.16))
+        case .butter: dyn(Tone.hex(0xF6DFA0), Tone.hex(0x5C4B1F))
+        }
+    }
+    static func selInk(_ s: SelectionStyle) -> Color {
+        switch s {
+        case .accent: onAccent
+        case .gray: pInk
+        case .butter: dyn(Tone.hex(0x3D2C00), Tone.hex(0xFFE3A0))
+        }
+    }
+    /// White on a dark accent, near-black on a light one (yellow, orange), so the row stays readable for any accent.
+    static let onAccent = Color(nsColor: NSColor(name: nil) { _ in
+        guard let c = NSColor.controlAccentColor.usingColorSpace(.sRGB) else { return .white }
+        return 0.2126 * c.redComponent + 0.7152 * c.greenComponent + 0.0722 * c.blueComponent > 0.6 ? Tone.hex(0x1C1C1E) : .white
+    })
+    /// Sidebar icon and project-dot colors: deeper in Light, brighter in Dark, 3:1 or better on the sidebar.
+    static func vivid(_ name: String) -> Color {
+        let (l, d): (Int, Int) = switch name {
+        case "orange": (0xB85C00, 0xFF9F0A)
+        case "blue": (0x1F6FD1, 0x78B4FF)
+        case "olive": (0x8A7400, 0xE2CB3E)
+        case "rose": (0xC73E55, 0xFF8A98)
+        case "lavender": (0x6B4FC8, 0xC0ABFF)
+        case "sand": (0x8A6A2E, 0xE0C08A)
+        default: (0x248A3D, 0x5BD27A) // sage
+        }
+        return dyn(Tone.hex(l), Tone.hex(d))
+    }
     static let onGold = Color(nsColor: Tone.hex(0x1C1C1E))
     /// A project color dark (or light) enough to read as text.
     static func readable(_ name: String) -> Color {
@@ -94,7 +124,7 @@ extension Palette {
 }
 
 enum PlannerSection: Hashable {
-    case today, upcoming, someday, done, goals, notes, calendar, workspace, project(UUID)
+    case today, upcoming, someday, done, goals, notes, calendar, workspace, customize, project(UUID)
 }
 
 // MARK: - Root: sidebar | list | detail
@@ -120,6 +150,8 @@ struct PlannerView: View {
                 WeekCalendar(store: store).frame(maxWidth: .infinity)
             } else if section == .workspace {
                 WorkspaceSettings(store: store).frame(maxWidth: .infinity)
+            } else if section == .customize {
+                PlannerCustomize(store: store).frame(maxWidth: .infinity)
             } else {
                 PlannerList(store: store, section: section, selected: $selected)
                     .frame(minWidth: 320, maxWidth: .infinity)
@@ -135,7 +167,7 @@ struct PlannerView: View {
                     }
                 }
             }
-            if section != .notes, section != .goals, section != .calendar, section != .workspace, let id = selected, store.tasks.contains(where: { $0.id == id }) {
+            if section != .notes, section != .goals, section != .calendar, section != .workspace, section != .customize, let id = selected, store.tasks.contains(where: { $0.id == id }) {
                 Divider()
                 TaskDetail(store: store, id: id, close: { selected = nil })
                     .id(id) // fresh local edit state per task
@@ -194,22 +226,22 @@ struct PlannerSidebar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Spacer().frame(height: 34) // under the traffic lights
-            row(.today, "Today", "sun.max.fill", .orange, store.todo.count)
-            row(.upcoming, "Upcoming", "calendar", Palette.blue, store.upcoming.count)
-            row(.someday, "Someday", "tray", Palette.olive, store.someday.count)
-            row(.done, "Done", "checkmark.circle", Palette.sage, nil)
-            row(.calendar, "Calendar", "calendar.day.timeline.left", Palette.blue, nil)
-            row(.goals, "Goals", "target", Palette.rose, store.objectives(in: store.thisWeek).filter { !store.isAchieved($0) }.count)
-            row(.notes, "Notes", "note.text", Palette.lavender, nil)
+            row(.today, "Today", "sun.max.fill", Palette.vivid("orange"), store.todo.count)
+            row(.upcoming, "Upcoming", "calendar", Palette.vivid("blue"), store.upcoming.count)
+            row(.someday, "Someday", "tray", Palette.vivid("olive"), store.someday.count)
+            row(.done, "Done", "checkmark.circle", Palette.vivid("sage"), nil)
+            row(.calendar, "Calendar", "calendar.day.timeline.left", Palette.vivid("blue"), nil)
+            row(.goals, "Goals", "target", Palette.vivid("rose"), store.objectives(in: store.thisWeek).filter { !store.isAchieved($0) }.count)
+            row(.notes, "Notes", "note.text", Palette.vivid("lavender"), nil)
 
-            Text("PROJECTS").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
+            Text("Projects").font(.subheadline.weight(.bold)).foregroundStyle(Palette.pInkSoft)
                 .padding(.top, 18).padding(.bottom, 4).padding(.horizontal, 10)
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(store.projects) { p in
                         if renaming == p.id {
                             HStack(spacing: 9) {
-                                Image(systemName: "circle.fill").font(.callout.weight(.semibold)).foregroundStyle(Palette.named(p.color)).frame(width: 18)
+                                Image(systemName: "circle.fill").font(.caption).foregroundStyle(Palette.vivid(p.color)).frame(width: 18)
                                 TextField("Project name", text: $renameText)
                                     .textFieldStyle(.plain).font(.body).focused($renameFocused)
                                     .onSubmit { store.renameProject(p.id, to: renameText); renaming = nil }
@@ -219,7 +251,7 @@ struct PlannerSidebar: View {
                             .background(Palette.card, in: RoundedRectangle(cornerRadius: 6))
                             .onAppear { renameFocused = true }
                         } else {
-                        row(.project(p.id), p.name, "circle.fill", Palette.named(p.color),
+                        row(.project(p.id), p.name, "circle.fill", Palette.vivid(p.color),
                             store.tasks(in: p.id).filter { !$0.done }.count)
                             .contextMenu {
                                 Button("Rename…") { renameText = p.name; renaming = p.id }
@@ -237,8 +269,11 @@ struct PlannerSidebar: View {
                     }
                     HStack(spacing: 8) {
                         Image(systemName: "plus").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
-                        TextField("New project", text: $newProject)
+                        TextField("", text: $newProject)
                             .textFieldStyle(.plain).font(.body)
+                            .background(alignment: .leading) { // the system placeholder is too faint to read
+                                if newProject.isEmpty { Text("New project").font(.body).foregroundStyle(Palette.pInkSoft) }
+                            }
                             .onSubmit {
                                 let name = newProject.trimmingCharacters(in: .whitespaces)
                                 guard !name.isEmpty else { return }
@@ -251,6 +286,7 @@ struct PlannerSidebar: View {
             }
             Spacer(minLength: 0)
             row(.workspace, "Workspace", "rectangle.3.group", Palette.pInkSoft, nil)
+            row(.customize, "Customize", "slider.horizontal.3", Palette.pInkSoft, nil)
             Picker("Appearance", selection: Binding(get: { store.settings.plannerLook }, set: {
                 store.settings.plannerLook = $0; PlannerWindow.shared.applyAppearance()
             })) {
@@ -265,16 +301,20 @@ struct PlannerSidebar: View {
 
     /// A sidebar row; tasks dragged onto it are moved there.
     func row(_ s: PlannerSection, _ title: String, _ icon: String, _ tint: Color, _ count: Int?) -> some View {
-        Button { section = s } label: {
+        let on = section == s, style = store.settings.plannerSelection
+        return Button { section = s } label: {
             HStack(spacing: 9) {
-                Image(systemName: icon).font(.callout.weight(.semibold)).foregroundStyle(tint).frame(width: 18)
-                Text(title).font(.body.weight(section == s ? .semibold : .regular)).lineLimit(1)
-                    .foregroundStyle(section == s ? Palette.selectedInk : Palette.pInk)
+                Image(systemName: icon).font(icon == "circle.fill" ? .caption : .callout.weight(.semibold))
+                    .foregroundStyle(on && style != .gray ? Palette.selInk(style) : tint).frame(width: 18)
+                Text(title).font(.body.weight(on ? .semibold : .regular)).lineLimit(1)
+                    .foregroundStyle(on ? Palette.selInk(style) : Palette.pInk)
                 Spacer()
-                if let count, count > 0 { Text("\(count)").font(.subheadline).foregroundStyle(Palette.pInkSoft) }
+                if let count, count > 0 {
+                    Text("\(count)").font(.subheadline.weight(on ? .semibold : .regular)).foregroundStyle(on ? Palette.selInk(style) : Palette.pInkSoft)
+                }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(section == s ? Palette.selected : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .background(on ? Palette.selFill(style) : .clear, in: RoundedRectangle(cornerRadius: 6))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -290,7 +330,7 @@ struct PlannerSidebar: View {
         case .upcoming: store.schedule(id, day: Calendar.current.date(byAdding: .day, value: 1, to: store.today))
         case .someday: store.schedule(id, day: nil, someday: true)
         case .done: if store.tasks.first(where: { $0.id == id })?.done == false { store.toggle(id) }
-        case .notes, .goals, .calendar, .workspace: break
+        case .notes, .goals, .calendar, .workspace, .customize: break
         case .project(let p): store.update(id) { $0.projectID = p }
         }
     }
@@ -313,6 +353,7 @@ struct PlannerList: View {
         case .done: "Done"
         case .notes: "Notes"
         case .workspace: "Workspace"
+        case .customize: "Customize"
         case .goals: "Goals"
         case .calendar: "Calendar"
         case .project(let id): store.projects.first { $0.id == id }?.name ?? "Project"
@@ -332,7 +373,7 @@ struct PlannerList: View {
             return [(nil, store.someday)]
         case .done:
             return byDay(store.doneRecent) { Calendar.current.startOfDay(for: $0.completedAt!) }
-        case .notes, .goals, .calendar, .workspace: return []
+        case .notes, .goals, .calendar, .workspace, .customize: return []
         case .project(let id):
             let all = store.tasks(in: id)
             let done = all.filter(\.done)

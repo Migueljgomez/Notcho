@@ -360,3 +360,74 @@ struct WorkspaceSettings: View {
         .foregroundStyle(Palette.pInk)
     }
 }
+
+// MARK: - Planner → Customize
+
+struct PlannerCustomize: View {
+    @Bindable var store: Store
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Customize").font(.title.weight(.bold))
+                Text("How the Planner window looks. The notch has its own settings under Customize in the notch.")
+                    .font(.body).foregroundStyle(Palette.pInkSoft).fixedSize(horizontal: false, vertical: true)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("APPEARANCE").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
+                    Picker("Appearance", selection: Binding(get: { store.settings.plannerLook }, set: {
+                        store.settings.plannerLook = $0; PlannerWindow.shared.applyAppearance()
+                    })) {
+                        ForEach(PlannerLook.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("SELECTION COLOR").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
+                    ForEach(SelectionStyle.allCases, id: \.self) { style in
+                        let chosen = store.settings.plannerSelection == style
+                        Button { store.settings.plannerSelection = style } label: {
+                            HStack(spacing: 14) {
+                                // A sample sidebar row in this style
+                                HStack(spacing: 8) {
+                                    Image(systemName: "tray").font(.callout.weight(.semibold))
+                                        .foregroundStyle(style == .gray ? Palette.vivid("olive") : Palette.selInk(style))
+                                    Text("Someday").font(.body.weight(.semibold)).foregroundStyle(Palette.selInk(style))
+                                    Spacer()
+                                    Text("16").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.selInk(style))
+                                }
+                                .padding(.horizontal, 10).padding(.vertical, 6).frame(width: 190)
+                                .background(Palette.selFill(style), in: RoundedRectangle(cornerRadius: 6))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(style.rawValue).font(.body.weight(.medium))
+                                    Text(style.note).font(.callout).foregroundStyle(Palette.pInkSoft)
+                                }
+                                Spacer()
+                                Image(systemName: chosen ? "checkmark.circle.fill" : "circle").font(.title3)
+                                    .foregroundStyle(chosen ? Color.accentColor : Palette.pInkSoft)
+                            }
+                            .padding(10)
+                            .background(Palette.card, in: RoundedRectangle(cornerRadius: 10))
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(style.rawValue).accessibilityAddTraits(chosen ? .isSelected : [])
+                    }
+                }
+            }
+            .frame(maxWidth: 560, alignment: .leading)
+            .padding(.horizontal, 28).padding(.top, 38).padding(.bottom, 28)
+        }
+    }
+}
+
+extension SelectionStyle {
+    var note: String {
+        switch self {
+        case .accent: "Follows the accent color in System Settings → Appearance."
+        case .gray: "The quietest. Icons keep their own colors."
+        case .butter: "A soft take on Notcho's gold."
+        }
+    }
+}

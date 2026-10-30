@@ -26,6 +26,8 @@ enum NotchLook: String, Codable, CaseIterable { case pastel = "Pastel", dark = "
 
 enum PlannerLook: String, Codable, CaseIterable { case system = "Match my Mac", light = "Light", dark = "Dark" }
 
+enum SelectionStyle: String, Codable, CaseIterable { case accent = "Mac accent color", gray = "Soft gray", butter = "Pale butter" }
+
 enum Unfinished: String, Codable, CaseIterable { case ask = "Ask me", carry = "Move to today", leave = "Leave in history" }
 
 enum TimerClick: String, Codable, CaseIterable { case pause = "Pause / Resume", restart = "Restart timer" }
@@ -64,6 +66,7 @@ struct Settings: Codable, Equatable {
     static let stayOpen = 3.5
     var notchLook = NotchLook.pastel
     var plannerLook = PlannerLook.system
+    var plannerSelection = SelectionStyle.accent  // the selected sidebar row in the Planner
     var holdToComplete = true   // Focus ✓ needs a press-and-hold
     var timerClick = TimerClick.pause  // clicking the clock on the task already being timed
 
@@ -89,6 +92,7 @@ struct Settings: Codable, Equatable {
         closeAfter = (try? c.decodeIfPresent(Double.self, forKey: .closeAfter)) ?? d.closeAfter
         notchLook = (try? c.decodeIfPresent(NotchLook.self, forKey: .notchLook)) ?? d.notchLook
         plannerLook = (try? c.decodeIfPresent(PlannerLook.self, forKey: .plannerLook)) ?? d.plannerLook
+        plannerSelection = (try? c.decodeIfPresent(SelectionStyle.self, forKey: .plannerSelection)) ?? d.plannerSelection
         holdToComplete = (try? c.decodeIfPresent(Bool.self, forKey: .holdToComplete)) ?? d.holdToComplete
         timerClick = (try? c.decodeIfPresent(TimerClick.self, forKey: .timerClick)) ?? d.timerClick
     }
