@@ -127,10 +127,21 @@ struct RootView: View {
 
             if store.focusState != .ready {
                 TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
-                    DotMatrix(text: clock(store.display(at: ctx.date)), dot: 1.9, color: .white.opacity(0.9))
+                    DotMatrix(text: clock(store.display(at: ctx.date)), dot: 1.9,
+                              color: .white.opacity(store.focusState == .paused ? 0.45 : 0.9)) // dim = paused
                 }
                 .frame(width: model.pill.width, height: model.pill.height)
                 .background(.black, in: Capsule())
+                .contentShape(Capsule())
+                .onTapGesture {
+                    switch store.focusState {
+                    case .running: store.pause()
+                    case .paused: store.start()
+                    default: break
+                    }
+                }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint(store.focusState == .running ? "Pause" : "Resume")
                 .offset(x: model.pill.minX, y: model.pill.minY)
                 .opacity(model.expanded ? 0 : 1)
                 .animation(.easeOut(duration: 0.12), value: model.expanded)

@@ -202,7 +202,9 @@ final class NotchController {
         let inside = surfaces.contains { $0.contains(p) }
         panel.ignoresMouseEvents = !inside && !model.dragging  // clicks outside the shape fall through to apps below
         if !inside { suppressUntilExit = false }
-        setHover(inside && !suppressUntilExit)
+        // The timer pill takes clicks (pause/resume) but doesn't open the notch; only the notch itself does.
+        let opens = model.expanded ? inside : notch.contains(p)
+        setHover(opens && !suppressUntilExit)
     }
 
     func setHover(_ inside: Bool) {
