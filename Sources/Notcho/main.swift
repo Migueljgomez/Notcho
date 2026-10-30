@@ -526,6 +526,11 @@ if CommandLine.arguments.contains("--selftest") {
     pb.clearContents(); pb.writeObjects([sample as NSURL]); dupe.paste(from: pb)
     precondition(dupe.items.map(\.name) == ["shot.png", "from the clipboard", "hello"])
     pb.releaseGlobally()
+    // Clear Fridge takes every magnet off (kept too), leaves the file alone, and Undo puts them all back in order
+    dupe.clear()
+    precondition(dupe.items.isEmpty && dupe.cleared?.count == 3 && FileManager.default.fileExists(atPath: sample.path(percentEncoded: false)))
+    dupe.undoClear()
+    precondition(dupe.items.map(\.name) == ["shot.png", "from the clipboard", "hello"] && dupe.cleared == nil)
     try? FileManager.default.removeItem(at: tmp)
     print("selftest ok")
     exit(0)

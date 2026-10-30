@@ -36,6 +36,7 @@ struct FridgeItem: Codable, Identifiable, Equatable {
     private(set) var info: [UUID: String] = [:]              // "PDF · 84 KB"
     private(set) var thumbs: [UUID: NSImage] = [:]           // image previews for the polaroids
     private(set) var undo: (added: UUID, slid: FridgeItem, at: Int)?
+    private(set) var cleared: [FridgeItem]?                  // what Clear Fridge took off, until Undo times out
     private(set) var full = false                            // a drop was refused because every item is kept
     @ObservationIgnored let file: URL
     @ObservationIgnored private var notice = 0
@@ -122,7 +123,7 @@ struct FridgeItem: Codable, Identifiable, Equatable {
 
     /// Shows a notice for a few seconds; a newer one replaces it.
     private func flash(_ show: () -> Void, clear: @escaping () -> Void) {
-        undo = nil; full = false; show(); notice += 1
+        undo = nil; full = false; cleared = nil; show(); notice += 1
         let n = notice
         DispatchQueue.main.asyncAfter(deadline: .now() + 6) { if self.notice == n { clear() } }
     }
@@ -206,6 +207,20 @@ struct FridgeItem: Codable, Identifiable, Equatable {
         items.removeAll { $0.id == id }
         if undo?.added == id { undo = nil }
         save(); refresh()
+    }
+
+    /// Takes every magnet off, kept ones too. Files and kept copies stay where they are; Undo puts the magnets back.
+    func clear() {
+        guard !items.isEmpty else { return }
+        let all = items
+        items = []; save(); refresh()
+        flash { self.cleared = all } clear: { self.cleared = nil }
+    }
+
+    func undoClear() {
+        guard let c = cleared else { return }
+        items = Array((c + items.filter { n in !c.contains { $0.id == n.id } }).prefix(Self.limit))
+        cleared = nil; save(); refresh()
     }
 
     // MARK: Files
@@ -310,6 +325,7 @@ struct FridgeCard: View {
             .onTapGesture { focused = true } // then ⌘V pastes; magnets keep their own clicks
             .contextMenu {
                 Button { fridge.paste() } label: { Label("Paste", systemImage: "doc.on.clipboard") }.disabled(!Fridge.canPaste())
+                Button { fridge.clear() } label: { Label("Clear Fridge", systemImage: "xmark.circle") }.disabled(fridge.items.isEmpty)
             }
             .quickLookPreview($preview)
             .clipShape(RoundedRectangle(cornerRadius: Metrics.cardRadius, style: .continuous))
@@ -418,6 +434,12 @@ struct FridgeCard: View {
             HStack(spacing: 8) {
                 Text(w < 200 ? "Slid off" : "\(u.slid.name) slid off").lineLimit(1).truncationMode(.middle)
                 Button("Undo") { fridge.undoSlide() }.buttonStyle(.plain).fontWeight(.semibold).foregroundStyle(Color(nsColor: Tone.hex(0x0A64D8)))
+            }
+            .modifier(Toast())
+        } else if fridge.cleared != nil {
+            HStack(spacing: 8) {
+                Text("Fridge cleared").lineLimit(1)
+                Button("Undo") { fridge.undoClear() }.buttonStyle(.plain).fontWeight(.semibold).foregroundStyle(Color(nsColor: Tone.hex(0x0A64D8)))
             }
             .modifier(Toast())
         } else if fridge.full {
