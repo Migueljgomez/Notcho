@@ -11,6 +11,7 @@ enum Page: String, CaseIterable { case workspace = "Workspace", insights = "Insi
     var editing = false            // a text field has focus: don't collapse on hover-out
     var dragging = false           // moving or resizing a card, or the panel: don't collapse
     var setHeight: (CGFloat) -> Void = { _ in }  // the controller resizes the panel window
+    var setWidth: (CGFloat) -> Void = { _ in }
     var applyLook: () -> Void = {}                // the controller sets the panel's appearance
     var page = Page.workspace
     var collapsed = CGSize(width: 200, height: 32)
@@ -36,7 +37,15 @@ enum Palette {
 enum Metrics {
     static let panelWidth: CGFloat = 940   // the 16" has room for a wide panel
     static let panelHeight: CGFloat = 360
-    static let outer: CGFloat = 16         // panel edge → cards
+    static let outer: CGFloat = 16         // panel edge → cards (Planner and settings layouts)
+    static let ear: CGFloat = 10           // NotchShape's top curves: the black body starts this far in from the window edge
+    static let inset: CGFloat = 12         // black edge → cards, on the sides and the bottom
+    static let minCard: CGFloat = 140
+    /// Narrowest panel that keeps `cards` cards at `minCard` each.
+    static func minWidth(cards: Int) -> CGFloat {
+        let n = CGFloat(max(cards, 1))
+        return n * minCard + (n - 1) * cardGap + 2 * (ear + inset)
+    }
     static let cardGap: CGFloat = 12       // between cards, and header → cards
     static let cardPadding: CGFloat = 16   // card edge → content
     static let cardRadius = Theme.cardRadius
@@ -47,7 +56,7 @@ enum Metrics {
 
 struct NotchShape: Shape {
     func path(in r: CGRect) -> Path {
-        let top = min(r.width * 0.125, 10), bottom = min(r.height * 0.5, 26)
+        let top = min(r.width * 0.125, Metrics.ear), bottom = min(r.height * 0.5, Theme.panelRadius)
         var p = Path()
         p.move(to: CGPoint(x: r.minX, y: r.minY))
         p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
@@ -204,8 +213,11 @@ struct WorkspaceView: View {
             case .customize: CustomizeView(store: store)
             }
         }
-        .padding(.horizontal, Metrics.outer).padding(.top, 6).padding(.bottom, Metrics.outer)
+        // The black body starts `ear` in from the window edge (NotchShape's top curves); cards sit `inset` inside it on every side.
+        .padding(.horizontal, Metrics.ear + Metrics.inset).padding(.top, 6).padding(.bottom, Metrics.inset)
         .overlay(alignment: .bottom) { if model.page == .workspace { heightHandle } }
+        .overlay(alignment: .leading) { if model.page == .workspace { widthHandle(side: -1) } }
+        .overlay(alignment: .trailing) { if model.page == .workspace { widthHandle(side: 1) } }
         .onChange(of: field) { model.editing = field != nil }
         .onChange(of: model.expanded) { if !model.expanded { field = nil } }
     }
@@ -218,6 +230,7 @@ struct WorkspaceView: View {
     @State private var resizeStart: (CGFloat, CGFloat)?
     @State private var hoverGap: CardKind?
     @State private var heightStart: CGFloat?
+    @State private var widthStart: (width: CGFloat, mouseX: CGFloat)?
 
     /// Dot handle dragged: the card follows the pointer and swaps with a neighbor once it passes that neighbor's middle.
     func grip(_ kind: CardKind, _ v: DragGesture.Value?, cards: [CardKind], frames: [(x: CGFloat, width: CGFloat)]) {
@@ -257,7 +270,7 @@ struct WorkspaceView: View {
             .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("cards"))
                 .onChanged { v in
                     if resizeStart == nil { resizeStart = (store.settings.weight(l), store.settings.weight(r)); model.dragging = true }
-                    store.settings.resize(l, r, from: resizeStart!, by: v.translation.width, perPoint: perPoint, minWidth: 140)
+                    store.settings.resize(l, r, from: resizeStart!, by: v.translation.width, perPoint: perPoint, minWidth: Metrics.minCard)
                 }
                 .onEnded { _ in resizeStart = nil; model.dragging = false })
             .help("Drag to resize · double-click to make them equal")
@@ -276,6 +289,24 @@ struct WorkspaceView: View {
                 }
                 .onEnded { _ in heightStart = nil; model.dragging = false })
             .help("Drag to change the height · double-click to reset")
+    }
+
+    /// A side edge: drag to make the panel wider or narrower (both sides move, so it stays under the notch), double-click for the default.
+    func widthHandle(side: CGFloat) -> some View {
+        Capsule().fill(.white.opacity(widthStart != nil ? 0.5 : 0.2)).frame(width: 4, height: 40)
+            .frame(width: Metrics.inset, height: 160).contentShape(Rectangle())
+            .padding(side < 0 ? .leading : .trailing, Metrics.ear) // in the black strip between the edge and the cards
+            .onHover { if $0 { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() } }
+            .onTapGesture(count: 2) { model.setWidth(Metrics.panelWidth) }
+            // The window moves as it resizes, so measure the pointer on screen, not in the view.
+            .gesture(DragGesture(minimumDistance: 1)
+                .onChanged { _ in
+                    let x = NSEvent.mouseLocation.x
+                    if widthStart == nil { widthStart = (CGFloat(store.settings.panelWidth), x); model.dragging = true }
+                    model.setWidth(widthStart!.width + 2 * side * (x - widthStart!.mouseX))
+                }
+                .onEnded { _ in widthStart = nil; model.dragging = false })
+            .help("Drag to change the width · double-click to reset")
     }
 
     @ViewBuilder func card(_ kind: CardKind) -> some View {

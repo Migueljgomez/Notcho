@@ -15,7 +15,7 @@ enum Theme {
     static let goldEdge = Color(red: 0.788, green: 0.467, blue: 0.122)
 
     // MARK: Corners nest: an inner corner is the outer corner minus the padding between them.
-    static let panelRadius: CGFloat = 26
+    static let panelRadius: CGFloat = 30   // card 18 + the 12 pt inset, so the corners nest
     static let cardRadius: CGFloat = 18
     static func inner(_ outer: CGFloat, padding: CGFloat) -> CGFloat { max(outer - padding, 4) }
 
@@ -44,7 +44,11 @@ enum Tone {
     /// Card pastels: the user's pick (Planner → Workspace → Card colors) or the default. Dark island cards stay dark.
     static var custom: [CardKind: Int] = [:]
     static let defaults: [CardKind: Int] = [.tasks: 0xD3EBD7, .focus: 0xD2E2F6, .notepad: 0xF7E9AE, .events: 0xE2D7F2]
-    static func card(_ kind: CardKind) -> Color { pair(custom[kind] ?? defaults[kind]!, 0x1C1C1E, light: 0xF5F5F7) }
+    static func card(_ kind: CardKind) -> Color {
+        let pastel = hex(custom[kind] ?? defaults[kind]!)
+        // Light look: a soft wash of the same pastel (60%) over the Planner's near-white.
+        return pair(pastel, hex(0x1C1C1E), light: hex(0xF7F7F8).blended(withFraction: 0.6, of: pastel) ?? pastel)
+    }
     /// Pastels that keep every card's text at 4.5:1 or better, highlights included.
     static let swatches = [0xD3EBD7, 0xD2E2F6, 0xF7E9AE, 0xE2D7F2, 0xF6D5D5, 0xF9DFC4, 0xD5EDEB, 0xE6E3DC]
     /// Secondary text (`inkSoft`) on the card's highlight (`wash`) is the weakest pair; it needs 4.5:1.

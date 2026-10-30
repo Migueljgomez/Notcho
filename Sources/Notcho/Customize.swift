@@ -345,13 +345,22 @@ struct WorkspaceSettings: View {
                         Slider(value: $store.settings.panelHeight, in: 240...700, step: 10)
                         Text("\(Int(store.settings.panelHeight)) px").font(.callout.monospacedDigit()).frame(width: 52, alignment: .trailing)
                     }
+                    Text("PANEL WIDTH").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft).padding(.top, 6)
+                    HStack {
+                        let lo = Double(Metrics.minWidth(cards: store.settings.visibleCards.count))
+                        let hi = max(Double((NSScreen.main?.frame.width ?? 1440) - 32), lo + 10)
+                        Slider(value: Binding(get: { min(max(store.settings.panelWidth, lo), hi) }, set: { store.settings.panelWidth = $0 }),
+                               in: lo...hi, step: 10)
+                        Text("\(Int(store.settings.panelWidth)) px").font(.callout.monospacedDigit()).frame(width: 52, alignment: .trailing)
+                    }
+                    Text("You can also drag either side of the open notch.").font(.callout).foregroundStyle(Palette.pInkSoft)
                 }
                 .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("CARD COLORS").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
                     ForEach(CardKind.allCases) { kind in CardColorRow(store: store, kind: kind) }
-                    Text("Used by the Pastel look. Light uses the Planner's gray cards, and Dark island cards stay dark.")
+                    Text("Pastel uses these colors in full; Light uses a soft wash of them. Dark island cards stay dark.")
                         .font(.callout).foregroundStyle(Palette.pInkSoft)
                 }
                 .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))
@@ -361,7 +370,7 @@ struct WorkspaceSettings: View {
                         Label("Reset layout", systemImage: "arrow.counterclockwise")
                     }
                     .buttonStyle(Pill(fill: Palette.pWash))
-                    .help("Card order, widths, visibility and height back to the default")
+                    .help("Card order, widths, visibility, height and panel width back to the default")
                     Button { withAnimation(.snappy) { store.settings.cardColors = [:] } } label: {
                         Label("Reset theme", systemImage: "paintpalette")
                     }

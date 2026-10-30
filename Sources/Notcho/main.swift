@@ -13,8 +13,8 @@ enum NotchLayout {
     }
 
     /// Expanded workspace hanging from the top edge, centred; never wider than the screen minus 32.
-    static func workspaceFrame(screen: CGRect, height: CGFloat = Metrics.panelHeight) -> CGRect {
-        let w = min(max(screen.width - 32, 0), Metrics.panelWidth)
+    static func workspaceFrame(screen: CGRect, height: CGFloat = Metrics.panelHeight, width: CGFloat = Metrics.panelWidth) -> CGRect {
+        let w = min(max(screen.width - 32, 0), width)
         let h = min(height, max(screen.height - 32, 0))
         return CGRect(x: screen.midX - w / 2, y: screen.maxY - h, width: w, height: h)
     }
@@ -44,6 +44,7 @@ final class NotchController {
     var menuOpen = false
     var pinned = false             // opened by the shortcut: stays open until click-outside, Esc, ✕ or hover-out
     var appliedHeight = 0.0        // the settings height the window was last sized for
+    var appliedWidth = 0.0
 
     init() {
         panel.isOpaque = false
@@ -57,6 +58,12 @@ final class NotchController {
         model.setHeight = { [weak self] h in
             guard let self, let screen = panel.screen ?? NSScreen.main else { return }
             store.settings.panelHeight = Double(min(max(h, 240), screen.frame.height - 120))
+            layout()
+        }
+        model.setWidth = { [weak self] w in
+            guard let self, let screen = panel.screen ?? NSScreen.main else { return }
+            let lo = Metrics.minWidth(cards: store.settings.visibleCards.count)
+            store.settings.panelWidth = Double(min(max(w, lo), max(screen.frame.width - 32, lo)))
             layout()
         }
         model.applyLook = { [weak self] in
@@ -182,7 +189,8 @@ final class NotchController {
                                       right: screen.auxiliaryTopRightArea, menuBarHeight: menuBar)
             ?? CGRect(x: screen.frame.midX - 100, y: screen.frame.maxY - 24, width: 200, height: 24)
         appliedHeight = store.settings.panelHeight
-        workspace = NotchLayout.workspaceFrame(screen: screen.frame, height: CGFloat(appliedHeight))
+        appliedWidth = store.settings.panelWidth
+        workspace = NotchLayout.workspaceFrame(screen: screen.frame, height: CGFloat(appliedHeight), width: CGFloat(appliedWidth))
         pill = NotchLayout.pillFrame(notch: notch)
         model.collapsed = notch.size
         model.workspace = workspace.size
@@ -241,7 +249,7 @@ final class NotchController {
     }
 
     func setExpanded(_ value: Bool) {
-        if value && store.settings.panelHeight != appliedHeight { layout() } // height changed in the Planner
+        if value && (store.settings.panelHeight != appliedHeight || store.settings.panelWidth != appliedWidth) { layout() } // changed in the Planner
         if !value { panel.makeFirstResponder(nil); model.editing = false; pinned = false }
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         let anim: Animation? = reduceMotion ? nil : .spring(response: value ? 0.38 : 0.3, dampingFraction: 1.0)
@@ -262,6 +270,9 @@ if CommandLine.arguments.contains("--selftest") {
     let w = NotchLayout.workspaceFrame(screen: screen)
     precondition(w.width == Metrics.panelWidth && w.midX == screen.midX && w.maxY == screen.maxY)
     precondition(NotchLayout.workspaceFrame(screen: CGRect(x: 0, y: 0, width: 400, height: 300)).width == 368)
+    let narrow = NotchLayout.workspaceFrame(screen: screen, width: 700)
+    precondition(narrow.width == 700 && narrow.midX == screen.midX) // resized panels stay centred under the notch
+    precondition(Metrics.minWidth(cards: 4) == 640 && Metrics.minWidth(cards: 1) == 184) // 4×140 + 3×12 gaps + 2×22 sides
     let p = NotchLayout.pillFrame(notch: n)
     precondition(p.minX == n.maxX + 6 && p.midY == n.midY && p.height == 28)
     precondition(clock(1500) == "25:00" && clock(59.2) == "01:00" && clock(0) == "00:00")

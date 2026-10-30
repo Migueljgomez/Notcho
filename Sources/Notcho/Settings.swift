@@ -62,6 +62,7 @@ struct Settings: Codable, Equatable {
     var wrapUpHour = 17         // daily wrap-up banner at this hour; 0 = off
     var cardWeights: [CardKind: Double] = [:]  // resized card widths; missing = the card's default
     var panelHeight = Double(Metrics.panelHeight)
+    var panelWidth = Double(Metrics.panelWidth)
     var closeAfter = 0.0        // seconds the notch waits after the pointer leaves; `stayOpen` = only click-away, Esc or ✕
     static let stayOpen = 3.5
     var notchLook = NotchLook.light
@@ -91,6 +92,7 @@ struct Settings: Codable, Equatable {
         wrapUpHour = (try? c.decodeIfPresent(Int.self, forKey: .wrapUpHour)) ?? d.wrapUpHour
         cardWeights = (try? c.decodeIfPresent([CardKind: Double].self, forKey: .cardWeights)) ?? d.cardWeights
         panelHeight = (try? c.decodeIfPresent(Double.self, forKey: .panelHeight)) ?? d.panelHeight
+        panelWidth = (try? c.decodeIfPresent(Double.self, forKey: .panelWidth)) ?? d.panelWidth
         closeAfter = (try? c.decodeIfPresent(Double.self, forKey: .closeAfter)) ?? d.closeAfter
         notchLook = (try? c.decodeIfPresent(NotchLook.self, forKey: .notchLook)) ?? d.notchLook
         plannerLook = (try? c.decodeIfPresent(PlannerLook.self, forKey: .plannerLook)) ?? d.plannerLook
@@ -110,7 +112,7 @@ struct Settings: Codable, Equatable {
     /// Card order, visibility, widths and panel height back to the defaults.
     mutating func resetLayout() {
         let d = Settings()
-        cardOrder = d.cardOrder; hiddenCards = d.hiddenCards; cardWeights = d.cardWeights; panelHeight = d.panelHeight
+        cardOrder = d.cardOrder; hiddenCards = d.hiddenCards; cardWeights = d.cardWeights; panelHeight = d.panelHeight; panelWidth = d.panelWidth
     }
 
     /// Dragging the gap between `left` and `right` by `dx` points (`perPoint` = weight per point); both keep `minWidth`.
