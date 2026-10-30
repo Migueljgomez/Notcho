@@ -515,7 +515,7 @@ struct PlannerRow: View {
                     Text(task.title).font(.title3).strikethrough(task.done).foregroundStyle(task.done ? Palette.pInkSoft : Palette.pInk)
                 }
                 let subs = task.subtasks ?? []
-                if !subs.isEmpty {
+                if !subs.isEmpty && store.settings.showSubtasks {
                     Text("\(subs.filter(\.done).count)/\(subs.count) subtasks").font(.subheadline).foregroundStyle(Palette.pInkSoft)
                 }
                 HStack(spacing: 10) {
@@ -636,7 +636,7 @@ struct TaskDetail: View {
                         EstimateControl(store: store, task: task)
                     }
 
-                    VStack(alignment: .leading, spacing: 6) {
+                    if store.settings.showSubtasks { VStack(alignment: .leading, spacing: 6) {
                         Text("Subtasks").font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
                         ForEach(task.subtasks ?? []) { s in
                             HStack(spacing: 8) {
@@ -657,7 +657,7 @@ struct TaskDetail: View {
                                 store.update(id) { $0.subtasks = ($0.subtasks ?? []) + [Subtask(title: t)] }
                                 newSub = ""
                             }
-                    }
+                    } }
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Notes").font(.callout.weight(.semibold)).foregroundStyle(Palette.pInkSoft)

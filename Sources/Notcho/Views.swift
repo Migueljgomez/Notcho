@@ -269,10 +269,10 @@ struct WorkspaceView: View {
 
     @ViewBuilder func card(_ kind: CardKind) -> some View {
         switch kind {
-        case .tasks: TasksCard(store: store, field: $field)
-        case .focus: FocusCard(store: store)
-        case .notepad: NotepadCard(store: store, field: $field)
-        case .events: EventsCard(store: store)
+        case .tasks: TasksCard(store: store, field: $field).id(store.settings.cardColors[kind]) // redraw on a new color
+        case .focus: FocusCard(store: store).id(store.settings.cardColors[kind])
+        case .notepad: NotepadCard(store: store, field: $field).id(store.settings.cardColors[kind])
+        case .events: EventsCard(store: store).id(store.settings.cardColors[kind])
         }
     }
 }

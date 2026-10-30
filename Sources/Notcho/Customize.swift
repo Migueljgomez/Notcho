@@ -348,11 +348,26 @@ struct WorkspaceSettings: View {
                 }
                 .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))
 
-                Button { withAnimation(.snappy) { store.settings.resetLayout() } } label: {
-                    Label("Reset layout", systemImage: "arrow.counterclockwise")
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("CARD COLORS").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
+                    ForEach(CardKind.allCases) { kind in CardColorRow(store: store, kind: kind) }
+                    Text("Used by the Pastel look, and by Match my Mac in Light mode. Dark island cards stay dark.")
+                        .font(.callout).foregroundStyle(Palette.pInkSoft)
                 }
-                .buttonStyle(Pill(fill: Palette.pWash))
-                .help("Card order, widths, visibility and height back to the default")
+                .padding(14).background(Palette.card, in: RoundedRectangle(cornerRadius: 12))
+
+                HStack(spacing: 8) {
+                    Button { withAnimation(.snappy) { store.settings.resetLayout() } } label: {
+                        Label("Reset layout", systemImage: "arrow.counterclockwise")
+                    }
+                    .buttonStyle(Pill(fill: Palette.pWash))
+                    .help("Card order, widths, visibility and height back to the default")
+                    Button { withAnimation(.snappy) { store.settings.cardColors = [:] } } label: {
+                        Label("Reset theme", systemImage: "paintpalette")
+                    }
+                    .buttonStyle(Pill(fill: Palette.pWash))
+                    .help("All four card colors back to the default pastels")
+                }
             }
             .padding(.horizontal, 28).padding(.top, 40).padding(.bottom, 28)
             .frame(maxWidth: 640, alignment: .leading)
@@ -382,6 +397,17 @@ struct PlannerCustomize: View {
                     }
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
                 }
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show subtasks").font(.body.weight(.medium))
+                        Text("Off hides them in the Planner. They're kept, and your AI can still use them.")
+                            .font(.callout).foregroundStyle(Palette.pInkSoft)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $store.settings.showSubtasks).toggleStyle(.switch).labelsHidden()
+                }
+                .padding(10).background(Palette.card, in: RoundedRectangle(cornerRadius: 10))
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("SELECTION COLOR").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
@@ -431,3 +457,42 @@ extension SelectionStyle {
         }
     }
 }
+
+/// One card's color: the readable pastels, a custom pick, and a warning if the custom pick is too dark to read on.
+struct CardColorRow: View {
+    @Bindable var store: Store
+    let kind: CardKind
+
+    var current: Int { store.settings.cardColors[kind] ?? Tone.defaults[kind]! }
+    func set(_ v: Int) { store.settings.cardColors[kind] = v == Tone.defaults[kind] ? nil : v }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: kind.icon).frame(width: 18)
+                Text(kind.title).font(.body).frame(width: 120, alignment: .leading)
+                ForEach(Tone.swatches, id: \.self) { v in
+                    Button { set(v) } label: {
+                        Circle().fill(Color(nsColor: Tone.hex(v))).frame(width: 20, height: 20)
+                            .overlay(Circle().stroke(Palette.pInk, lineWidth: current == v ? 2 : 0.5).opacity(current == v ? 1 : 0.25))
+                            .overlay { if current == v { Image(systemName: "checkmark").font(.caption2.weight(.bold)).foregroundStyle(Tone.hex(0x1C1C1E).swiftUI) } }
+                    }
+                    .buttonStyle(.plain).accessibilityLabel(String(format: "Color #%06X", v)).accessibilityAddTraits(current == v ? .isSelected : [])
+                }
+                ColorPicker("Custom", selection: Binding(
+                    get: { Color(nsColor: Tone.hex(current)) },
+                    set: { c in
+                        guard let n = NSColor(c).usingColorSpace(.sRGB) else { return }
+                        set(Int(n.redComponent * 255) << 16 | Int(n.greenComponent * 255) << 8 | Int(n.blueComponent * 255))
+                    }), supportsOpacity: false)
+                    .labelsHidden().help("Custom color")
+            }
+            if !Tone.readable(current) {
+                Label("Text may be hard to read on this color. Try a lighter one.", systemImage: "exclamationmark.triangle")
+                    .font(.callout).foregroundStyle(Tone.alert).padding(.leading, 26)
+            }
+        }
+    }
+}
+
+extension NSColor { var swiftUI: Color { Color(nsColor: self) } }

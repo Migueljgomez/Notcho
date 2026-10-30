@@ -67,6 +67,8 @@ struct Settings: Codable, Equatable {
     var notchLook = NotchLook.pastel
     var plannerLook = PlannerLook.system
     var plannerSelection = SelectionStyle.accent  // the selected sidebar row in the Planner
+    var cardColors: [CardKind: Int] = [:]  // custom pastel per card (hex); missing = the default
+    var showSubtasks = true
     var holdToComplete = true   // Focus ✓ needs a press-and-hold
     var timerClick = TimerClick.pause  // clicking the clock on the task already being timed
 
@@ -93,6 +95,8 @@ struct Settings: Codable, Equatable {
         notchLook = (try? c.decodeIfPresent(NotchLook.self, forKey: .notchLook)) ?? d.notchLook
         plannerLook = (try? c.decodeIfPresent(PlannerLook.self, forKey: .plannerLook)) ?? d.plannerLook
         plannerSelection = (try? c.decodeIfPresent(SelectionStyle.self, forKey: .plannerSelection)) ?? d.plannerSelection
+        cardColors = (try? c.decodeIfPresent([CardKind: Int].self, forKey: .cardColors)) ?? d.cardColors
+        showSubtasks = (try? c.decodeIfPresent(Bool.self, forKey: .showSubtasks)) ?? d.showSubtasks
         holdToComplete = (try? c.decodeIfPresent(Bool.self, forKey: .holdToComplete)) ?? d.holdToComplete
         timerClick = (try? c.decodeIfPresent(TimerClick.self, forKey: .timerClick)) ?? d.timerClick
     }

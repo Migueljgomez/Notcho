@@ -85,7 +85,7 @@ enum FocusPhase: String, Codable { case ready, running, paused, finished }
     var focusLog: [FocusEntry] = [] { didSet { save() } }
     var focusStartedAt: Date? { didSet { save() } }             // stopwatch: current running stretch
     var focusElapsed: TimeInterval = 0 { didSet { save() } }    // stopwatch: time before that stretch
-    var settings = Settings() { didSet { save() } }
+    var settings = Settings() { didSet { Tone.custom = settings.cardColors; save() } }
 
     // Calendar (not saved)
     @ObservationIgnored let eventStore = EKEventStore()
@@ -117,6 +117,7 @@ enum FocusPhase: String, Codable { case ready, running, paused, finished }
             focusRemaining = s.focusRemaining; focusTotal = s.focusTotal
             focusLog = s.focusLog ?? []
             focusStartedAt = s.focusStartedAt; focusElapsed = s.focusElapsed ?? 0; settings = s.settings ?? Settings()
+            Tone.custom = settings.cardColors
         }
         loading = false
     }

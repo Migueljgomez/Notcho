@@ -36,10 +36,30 @@ enum Theme {
 /// Notch colors: pastel under a Light appearance, the dark island under Dark. The panel's appearance
 /// (Customize → Appearance) decides which, so views never check the mode themselves.
 enum Tone {
-    static let tasks = pair(0xD3EBD7, 0x1C1C1E)
-    static let focus = pair(0xD2E2F6, 0x1C1C1E)
-    static let notes = pair(0xF7E9AE, 0x1C1C1E)
-    static let events = pair(0xE2D7F2, 0x1C1C1E)
+    static var tasks: Color { card(.tasks) }
+    static var focus: Color { card(.focus) }
+    static var notes: Color { card(.notepad) }
+    static var events: Color { card(.events) }
+
+    /// Card pastels: the user's pick (Planner → Workspace → Card colors) or the default. Dark island cards stay dark.
+    static var custom: [CardKind: Int] = [:]
+    static let defaults: [CardKind: Int] = [.tasks: 0xD3EBD7, .focus: 0xD2E2F6, .notepad: 0xF7E9AE, .events: 0xE2D7F2]
+    static func card(_ kind: CardKind) -> Color { pair(custom[kind] ?? defaults[kind]!, 0x1C1C1E) }
+    /// Pastels that keep every card's text at 4.5:1 or better, highlights included.
+    static let swatches = [0xD3EBD7, 0xD2E2F6, 0xF7E9AE, 0xE2D7F2, 0xF6D5D5, 0xF9DFC4, 0xD5EDEB, 0xE6E3DC]
+    /// Secondary text (`inkSoft`) on the card's highlight (`wash`) is the weakest pair; it needs 4.5:1.
+    static func readable(_ v: Int) -> Bool {
+        func lum(_ v: Int) -> Double {
+            [v >> 16 & 0xFF, v >> 8 & 0xFF, v & 0xFF].enumerated().reduce(0.0) { sum, e in
+                let c = Double(e.element) / 255
+                let lin = c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+                return sum + lin * [0.2126, 0.7152, 0.0722][e.offset]
+            }
+        }
+        let washed = [v >> 16 & 0xFF, v >> 8 & 0xFF, v & 0xFF].map { Int((Double($0) * 0.91).rounded()) }
+        let bg = lum(washed[0] << 16 | washed[1] << 8 | washed[2])
+        return (bg + 0.05) / (lum(0x4A4A4F) + 0.05) >= 4.5
+    }
     static let ink = pair(0x1C1C1E, 0xF5F5F7)
     // Secondary text and the tints below stay at 4.5:1 or better on every card color and on `wash`; Increase Contrast pushes them further.
     static let inkSoft = pair(hex(0x4A4A4F), hex(0x98989F), contrast: (hex(0x2C2C2E), hex(0xD1D1D6)))
