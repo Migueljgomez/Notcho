@@ -43,7 +43,7 @@ enum Tone {
 
     /// Card pastels: the user's pick (Planner → Workspace → Card colors) or the default. Dark island cards stay dark.
     static var custom: [CardKind: Int] = [:]
-    static let defaults: [CardKind: Int] = [.tasks: 0xD3EBD7, .focus: 0xD2E2F6, .notepad: 0xF7E9AE, .events: 0xE2D7F2]
+    static let defaults: [CardKind: Int] = [.tasks: 0xD3EBD7, .focus: 0xD2E2F6, .notepad: 0xF7E9AE, .events: 0xE2D7F2, .fridge: 0xE6E3DC] // the fridge is a photo; this only fills its rail chip
     static func card(_ kind: CardKind) -> Color {
         let pastel = hex(custom[kind] ?? defaults[kind]!)
         // Light look: a soft wash of the same pastel (60%) over the Planner's near-white.
@@ -84,7 +84,7 @@ enum Tone {
     static let tile = pair(NSColor.black.withAlphaComponent(0.09), NSColor.white.withAlphaComponent(0.08), light: hex(0x6B4FC8).withAlphaComponent(0.10))
     /// Card header icons: ink, except the Light look gives each card the Planner sidebar's color.
     static func icon(_ kind: CardKind) -> Color {
-        let v: Int = switch kind { case .tasks: 0x248A3D; case .events: 0x6B4FC8; case .focus: 0x1F6FD1; case .notepad: 0x8A7400 }
+        let v: Int = switch kind { case .tasks: 0x248A3D; case .events: 0x6B4FC8; case .focus: 0x1F6FD1; case .notepad: 0x8A7400; case .fridge: 0x1D1D1F }
         return pair(0x1C1C1E, 0xF5F5F7, light: v)
     }
 

@@ -6,7 +6,7 @@ swift build -c release
 APP=/Applications/Notcho.app # in Applications so it shows in Launchpad
 rm -rf $APP && mkdir -p $APP/Contents/MacOS
 cp .build/release/Notcho $APP/Contents/MacOS/
-mkdir -p $APP/Contents/Resources && cp Icon/AppIcon.icns $APP/Contents/Resources/
+mkdir -p $APP/Contents/Resources && cp Icon/AppIcon.icns Resources/*.png $APP/Contents/Resources/
 cat > $APP/Contents/Info.plist <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

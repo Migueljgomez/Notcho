@@ -314,11 +314,11 @@ if CommandLine.arguments.contains("--selftest") {
 
     var st = Settings()
     st.move(.tasks, onto: .notepad)
-    precondition(st.orderedCards == [.focus, .notepad, .tasks, .events])
+    precondition(st.orderedCards == [.focus, .notepad, .tasks, .events, .fridge])
     st.move(.events, onto: .focus)
-    precondition(st.orderedCards == [.events, .focus, .notepad, .tasks])
+    precondition(st.orderedCards == [.events, .focus, .notepad, .tasks, .fridge])
     st.cardOrder = [.notepad]   // older save missing kinds → appended
-    precondition(st.orderedCards == [.notepad, .tasks, .focus, .events])
+    precondition(st.orderedCards == [.notepad, .tasks, .focus, .events, .fridge])
     let old = try! JSONDecoder().decode(Settings.self, from: Data(#"{"stopwatch":true}"#.utf8))
     precondition(old.stopwatch && old.shortcut == .optN && old.completionSound) // missing fields → defaults
 
@@ -473,36 +473,49 @@ if CommandLine.arguments.contains("--selftest") {
     precondition(abs(lay.weight(.focus) - 0.14) < 1e-9 && abs(lay.weight(.tasks) - 0.41) < 1e-9)
     lay.panelHeight = 500; lay.resetLayout()
     precondition(lay.cardWeights.isEmpty && lay.panelHeight == Double(Metrics.panelHeight))
-    // Saved data from before a change still loads; settings saved without a newer field take its default
+    // Saved data from before a change still loads; settings saved without a newer field take its default, and retired fields are ignored
     if let data = try? Data(contentsOf: Store.fileURL) { precondition(Store.loads(data), "store.json no longer loads") }
-    let oldSettings = try! JSONDecoder().decode(Settings.self, from: Data(#"{"timerMenu":false}"#.utf8))
-    precondition(oldSettings.eventsWeek == false && oldSettings.timerMenu == false)
-    // Events → Week: sorting, the now line, folding past days, "+ N more", columns
-    let wk = cal.date(from: DateComponents(year: 2026, month: 10, day: 26))! // a Monday
-    func at(_ d: Int, _ h: Int) -> Date { cal.date(byAdding: .minute, value: d * 1440 + h * 60, to: wk)! }
-    var wdays = (0..<14).map { WeekDay(date: cal.date(byAdding: .day, value: $0, to: wk)!, items: []) }
-    wdays[0].items = [WeekItem(start: nil, title: "a", event: false, done: true), WeekItem(start: nil, title: "b", event: false, done: true)]
-    wdays[1].items = [WeekItem(start: at(1, 11), title: "c", event: false, done: true)]
-    wdays[3].items = WeekLayout.sorted([WeekItem(start: nil, title: "plan", event: false), WeekItem(start: at(3, 17), title: "five", event: true),
-                                        WeekItem(start: at(3, 14), title: "two", event: false, done: true), WeekItem(start: at(3, 15), title: "three", event: false),
-                                        WeekItem(start: nil, title: "holiday", event: true, allDay: true)])
-    precondition(wdays[3].items.map(\.title) == ["holiday", "two", "three", "five", "plan"])
-    wdays[4].items = [WeekItem(start: at(4, 10), title: "dentist", event: true)]
-    wdays[8].items = [WeekItem(start: nil, title: "ship", event: false)]
-    let now = at(3, 15) + 1800
-    let wl = WeekLayout.lines(wdays, today: 3, now: now, past: true, fold: true, foldRow: true, peek: false)
-    if case .fold = wl[0] {} else { preconditionFailure("past days should fold") }
-    let ni = wl.firstIndex(of: .now)!
-    if case let .item(i, _) = wl[ni - 1] { precondition(i.title == "three") } else { preconditionFailure("now line misplaced") }
-    let tall = WeekLayout.columns(wdays, today: 3, now: now, height: 1000, columns: 1, narrow: false, expanded: false)
-    precondition(tall.count == 1 && !tall[0].contains { if case .fold = $0 { true } else { false } } && !tall[0].contains { if case .more = $0 { true } else { false } })
-    let short = WeekLayout.columns(wdays, today: 3, now: now, height: 160, columns: 1, narrow: false, expanded: false)
-    precondition({ if case .fold = short[0][0] { true } else { false } }() && { if case .more = short[0].last! { true } else { false } }())
-    precondition(short[0].map(\.height).reduce(0, +) <= 160 && !short[0].last!.dangles)
-    let slim = WeekLayout.columns(wdays, today: 3, now: now, height: 120, columns: 1, narrow: true, expanded: false)
-    precondition(!slim[0].contains { if case .fold = $0 { true } else { false } })
-    let wide = WeekLayout.columns(wdays, today: 3, now: now, height: 200, columns: 2, narrow: false, expanded: false)
-    precondition(wide.count == 2 && wide.joined().contains(.nextWeek) && wide.allSatisfy { $0.map(\.height).reduce(0, +) <= 200 })
+    let oldSettings = try! JSONDecoder().decode(Settings.self, from: Data(#"{"timerMenu":false,"eventsWeek":true}"#.utf8))
+    precondition(oldSettings.timerMenu == false)
+    // Fridge: settings saved before it existed add it last; five cards step aside Notepad, Fridge, Focus, Events
+    let oldOrder = try! JSONDecoder().decode(Settings.self, from: Data(#"{"cardOrder":["events","tasks","focus","notepad"]}"#.utf8))
+    precondition(oldOrder.orderedCards == [.events, .tasks, .focus, .notepad, .fridge])
+    let five: [CardKind] = [.tasks, .focus, .notepad, .events, .fridge]
+    precondition(Metrics.arrange(five, width: 896, rail: true, pick: nil) == ([.tasks, .focus, .events], [.notepad, .fridge])) // 940 panel
+    precondition(Metrics.arrange(five, width: 656, rail: true, pick: nil) == ([.tasks, .events], [.focus, .notepad, .fridge])) // 700 panel
+    precondition(Metrics.arrange(five, width: 436, rail: true, pick: nil) == ([.tasks], [.focus, .notepad, .events, .fridge])) // 480 panel
+    precondition(Metrics.arrange(five, width: 896, rail: true, pick: .fridge) == ([.tasks, .events, .fridge], [.focus, .notepad]))
+    // Magnets: each stays on one door, clear of the seam, at every size
+    for w in stride(from: 140, through: 700, by: 5) {
+        for h: CGFloat in [180, 298, 500] {
+            let (pts, sc) = Fridge.spots(w: CGFloat(w), h: h), half = 37 * sc, door = CGFloat(w) / 2
+            for p in pts {
+                let lo: CGFloat = p.x < door ? 0 : door
+                precondition(p.x - half >= lo + 4 && p.x + half <= lo + door - 4, "magnet on the seam at \(w)")
+            }
+        }
+    }
+    precondition(Fridge.spots(w: 140, h: 180).points.count == 2 && Fridge.spots(w: 240, h: 298).points.count == 4)
+    precondition(Fridge.spots(w: 440, h: 298).points.count == 6 && Fridge.spots(w: 240, h: 500).points.count == 8)
+    // 12 items: the 13th slides the oldest unkept one off; when all are kept, the drop is refused
+    func fi(_ n: String, kept: Bool = false) -> FridgeItem { FridgeItem(name: n, keptPath: kept ? "/kept/\(n)" : nil, tilt: 0, magnet: 0, addedAt: .now) }
+    var box = (0..<12).map { fi("f\($0)", kept: $0 == 11) } // newest first; the oldest (f11) is kept
+    let added = Fridge.adding(fi("new"), to: box)!
+    precondition(added.items.count == 12 && added.items[0].name == "new" && added.slid?.0.name == "f10" && added.slid?.1 == 10)
+    precondition(Fridge.adding(fi("x"), to: Array(box.prefix(5)))!.slid == nil)
+    box = (0..<12).map { fi("k\($0)", kept: true) }
+    precondition(Fridge.adding(fi("new"), to: box) == nil)
+    // fridge.json: no file, a round trip, and an unreadable file (set aside, never overwritten)
+    let tmp = FileManager.default.temporaryDirectory.appending(path: "notcho-selftest-\(UUID().uuidString)")
+    try! FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+    let fj = tmp.appending(path: "fridge.json")
+    precondition(Fridge(file: fj).items.isEmpty)
+    try! JSONEncoder().encode([fi("a"), fi("b", kept: true)]).write(to: fj)
+    precondition(Fridge(file: fj).items.map(\.name) == ["a", "b"])
+    try! Data("not json".utf8).write(to: fj)
+    precondition(Fridge(file: fj).items.isEmpty && !FileManager.default.fileExists(atPath: fj.path(percentEncoded: false)))
+    precondition((try! FileManager.default.contentsOfDirectory(atPath: tmp.path(percentEncoded: false))).contains { $0.hasPrefix("fridge.unreadable-") })
+    try? FileManager.default.removeItem(at: tmp)
     print("selftest ok")
     exit(0)
 }

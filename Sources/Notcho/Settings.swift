@@ -3,16 +3,16 @@ import Carbon.HIToolbox
 import ServiceManagement
 
 enum CardKind: String, Codable, CaseIterable, Identifiable {
-    case tasks, focus, notepad, events
+    case tasks, focus, notepad, events, fridge
     var id: Self { self }
-    var title: String { ["Tasks", "Focus timer", "Notepad", "Calendar events"][Self.allCases.firstIndex(of: self)!] }
-    var icon: String { ["checklist", "timer", "square.and.pencil", "calendar"][Self.allCases.firstIndex(of: self)!] }
+    var title: String { ["Tasks", "Focus timer", "Notepad", "Calendar events", "Fridge"][Self.allCases.firstIndex(of: self)!] }
+    var icon: String { ["checklist", "timer", "square.and.pencil", "calendar", "refrigerator"][Self.allCases.firstIndex(of: self)!] }
     /// Relative width on the Workspace page.
-    var weight: CGFloat { [0.36, 0.19, 0.2, 0.25][Self.allCases.firstIndex(of: self)!] }
+    var weight: CGFloat { [0.36, 0.19, 0.2, 0.25, 0.25][Self.allCases.firstIndex(of: self)!] }
     /// Narrowest width before the card's titles and rows start to break (measured on the 16").
-    var comfort: CGFloat { [300, 160, 170, 210][Self.allCases.firstIndex(of: self)!] }
+    var comfort: CGFloat { [300, 160, 170, 210, 240][Self.allCases.firstIndex(of: self)!] }
     /// When space runs short, cards step aside in this order; Tasks goes last.
-    static let dropOrder: [CardKind] = [.notepad, .focus, .events, .tasks]
+    static let dropOrder: [CardKind] = [.notepad, .fridge, .focus, .events, .tasks]
 }
 
 /// Where each visible card sits in a row `width` wide.
@@ -81,7 +81,6 @@ struct Settings: Codable, Equatable {
     var timerClick = TimerClick.pause  // clicking the clock on the task already being timed
     var timerMenu = true        // right-click the menu-bar timer: Pause/Resume, Restart, Stop
     var timerHoverStop = false  // hovering a paused menu-bar timer shows ✕ (off: don't make quitting easy)
-    var eventsWeek = false      // Events card shows the whole week instead of today
 
     init() {}
 
@@ -114,7 +113,6 @@ struct Settings: Codable, Equatable {
         timerClick = (try? c.decodeIfPresent(TimerClick.self, forKey: .timerClick)) ?? d.timerClick
         timerMenu = (try? c.decodeIfPresent(Bool.self, forKey: .timerMenu)) ?? d.timerMenu
         timerHoverStop = (try? c.decodeIfPresent(Bool.self, forKey: .timerHoverStop)) ?? d.timerHoverStop
-        eventsWeek = (try? c.decodeIfPresent(Bool.self, forKey: .eventsWeek)) ?? d.eventsWeek
     }
 
     /// Saved order plus any card kinds added since it was saved.

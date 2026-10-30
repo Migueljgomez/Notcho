@@ -319,6 +319,10 @@ struct WorkspaceView: View {
                             info: on ? clock(store.display(at: now)) : nil, live: store.focusState == .running)
         case .notepad:
             return DeckItem(id: kind.rawValue, icon: kind.icon, tint: Tone.icon(kind), color: kind.color, title: "Notepad")
+        case .fridge:
+            let n = Fridge.shared.items.count
+            return DeckItem(id: kind.rawValue, icon: kind.icon, tint: Tone.icon(kind), color: kind.color, title: "Fridge",
+                            info: n > 0 ? "\(n)" : nil, badge: n > 0 ? "\(n)" : nil)
         }
     }
 
@@ -471,6 +475,7 @@ struct WorkspaceView: View {
         case .focus: FocusCard(store: store).id(store.settings.cardColors[kind])
         case .notepad: NotepadCard(store: store, field: $field).id(store.settings.cardColors[kind])
         case .events: EventsCard(store: store).id(store.settings.cardColors[kind])
+        case .fridge: FridgeCard()
         }
     }
 }
@@ -500,7 +505,7 @@ extension EnvironmentValues {
 }
 
 extension CardKind {
-    var color: Color { [Tone.tasks, Tone.focus, Tone.notes, Tone.events][Self.allCases.firstIndex(of: self)!] }
+    var color: Color { [Tone.tasks, Tone.focus, Tone.notes, Tone.events, Tone.card(.fridge)][Self.allCases.firstIndex(of: self)!] }
 }
 
 struct Card<Content: View>: View {
@@ -1068,26 +1073,13 @@ struct EventsCard: View {
                 CardHeader(icon: "calendar", title: "Events", tint: Tone.icon(.events))
                 Spacer()
                 Menu {
-                    Picker("Show", selection: Binding(get: { store.settings.eventsWeek }, set: { store.settings.eventsWeek = $0 })) {
-                        Text("Today").tag(false); Text("This week").tag(true)
-                    }
-                    .pickerStyle(.inline)
-                    Divider()
                     Button("Open in Calendar") { NSWorkspace.shared.open(URL(string: "ical://")!) }
                     Button("Refresh") { store.loadEvents() }
                 } label: { Image(systemName: "ellipsis").accessibilityLabel("More") }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
             }
-            // Today | Week, like To do | Completed; on a narrow card it moves into the ⋯ menu
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 6) { modeTabs; Spacer(minLength: 4); Text(rangeLabel).font(.footnote).foregroundStyle(Tone.inkSoft).lineLimit(1).fixedSize() }
-                HStack { modeTabs; Spacer(minLength: 0) }
-                EmptyView()
-            }
             let reminders = store.reminders
-            if store.settings.eventsWeek {
-                WeekList(store: store).padding(.top, 2)
-            } else if reminders.isEmpty && (!store.calendarAccess || store.events.isEmpty) {
+            if reminders.isEmpty && (!store.calendarAccess || store.events.isEmpty) {
                 VStack(alignment: .leading, spacing: 6) {
                     Image(systemName: store.calendarAccess ? "calendar" : "calendar.badge.exclamationmark").font(.title)
                     Text(store.calendarAccess ? "Nothing scheduled" : "Calendar not connected").font(.title3.weight(.semibold))
@@ -1129,28 +1121,6 @@ struct EventsCard: View {
         Text(title.uppercased()).font(.footnote.weight(.semibold)).foregroundStyle(Tone.inkSoft)
     }
 
-    var modeTabs: some View {
-        HStack(spacing: 2) {
-            ForEach([false, true], id: \.self) { week in
-                let on = store.settings.eventsWeek == week
-                Button { store.settings.eventsWeek = week } label: {
-                    Text(week ? "Week" : "Today").fontWeight(on ? .semibold : .regular).lineLimit(1).fixedSize()
-                        .font(.callout).padding(.horizontal, 9).padding(.vertical, 4)
-                        .background(on ? Tone.raised : .clear, in: RoundedRectangle(cornerRadius: 7))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(2).background(Tone.wash, in: RoundedRectangle(cornerRadius: 9))
-    }
-
-    /// "Oct 26 – Nov 1" in Week; Today already shows its date by the Today heading.
-    var rangeLabel: String {
-        guard store.settings.eventsWeek else { return "" }
-        let monday = weekStart(store.today), sunday = Calendar.current.date(byAdding: .day, value: 6, to: monday)!
-        return "\(monday.formatted(.dateTime.month(.abbreviated).day())) – \(sunday.formatted(.dateTime.month(.abbreviated).day()))"
-    }
-
     func tile<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         content().padding(8).frame(maxWidth: .infinity, alignment: .leading)
             .background(Tone.tile, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -1189,158 +1159,6 @@ struct EventsCard: View {
             }
             .fixedSize(horizontal: false, vertical: true)
         }
-    }
-}
-
-// MARK: - Events · Week: the week as a list, laid out to whatever size the card is
-
-struct WeekItem: Equatable {
-    var start: Date?, title: String, event: Bool, done = false, minutes: Int? = nil, allDay = false, color: Color? = nil
-}
-struct WeekDay: Equatable { var date: Date; var items: [WeekItem] }
-
-enum WeekRow: Equatable {
-    case fold(String), day(String, today: Bool), item(WeekItem, past: Bool), peek(String, WeekItem), now, empty(String), more(Int), nextWeek
-    var height: CGFloat { self == .now ? 5 : 20 }
-    var isItem: Bool { if case .item = self { true } else if case .peek = self { true } else { false } }
-    var dangles: Bool { if case .day = self { true } else { self == .now || self == .nextWeek } }
-}
-
-enum WeekLayout {
-    /// All-day events first, then timed items by start, then untimed tasks in list order.
-    static func sorted(_ items: [WeekItem]) -> [WeekItem] {
-        items.filter(\.allDay) + items.filter { !$0.allDay && $0.start != nil }.sorted { $0.start! < $1.start! } + items.filter { !$0.allDay && $0.start == nil }
-    }
-
-    static func dayLabel(_ d: Date) -> String { d.formatted(.dateTime.weekday(.abbreviated).day()).uppercased() }
-
-    /// The week's lines, top to bottom: past days (folded into one line, or open), today with the now line, the rest
-    /// of the week, then next week's items when `peek`.
-    static func lines(_ days: [WeekDay], today: Int, now: Date, past: Bool, fold: Bool, foldRow: Bool, peek: Bool) -> [WeekRow] {
-        var r: [WeekRow] = []
-        if past && today > 0 {
-            let done = days.prefix(today).flatMap(\.items).filter(\.done).count
-            let span = today == 1 ? days[0].date.formatted(.dateTime.weekday(.abbreviated))
-                : "\(days[0].date.formatted(.dateTime.weekday(.abbreviated))) – \(days[today - 1].date.formatted(.dateTime.weekday(.abbreviated)))"
-            if foldRow { r.append(.fold("\(span) · \(done) done")) }
-            if !fold {
-                for d in days.prefix(today) where !d.items.isEmpty { r.append(.day(dayLabel(d.date), today: false)); r += d.items.map { .item($0, past: true) } }
-            }
-        }
-        for i in today..<min(7, days.count) {
-            let d = days[i], label = i == today ? "TODAY · \(dayLabel(d.date))" : dayLabel(d.date)
-            if d.items.isEmpty { r.append(.empty(label)); continue }
-            r.append(.day(label, today: i == today))
-            var items = d.items.map { WeekRow.item($0, past: false) }
-            if i == today, d.items.contains(where: { $0.start != nil && !$0.allDay }) {
-                // before the first timed item still to come, else after the last timed one
-                let at = d.items.firstIndex { !$0.allDay && ($0.start.map { $0 > now } ?? false) }
-                    ?? (d.items.lastIndex { !$0.allDay && $0.start != nil }! + 1)
-                items.insert(.now, at: at)
-            }
-            r += items
-        }
-        if peek {
-            let next = days.dropFirst(7).flatMap { d in d.items.map { WeekRow.peek(d.date.formatted(.dateTime.weekday(.abbreviated)), $0) } }
-            if !next.isEmpty { r.append(.nextWeek); r += next }
-        }
-        return r
-    }
-
-    /// Fills `columns` columns `height` tall. Past days open when the whole week fits (and fold into one line when it
-    /// doesn't, unless `expanded`); whatever is still left becomes "+ N more". Narrow cards skip past days.
-    static func columns(_ days: [WeekDay], today: Int, now: Date, height: CGFloat, columns: Int, narrow: Bool, expanded: Bool) -> [[WeekRow]] {
-        let peek = columns > 1
-        let open = pack(lines(days, today: today, now: now, past: !narrow, fold: false, foldRow: false, peek: peek), height: height, columns: columns)
-        if narrow || !open.joined().contains(where: { if case .more = $0 { true } else { false } }) { return open }
-        return pack(lines(days, today: today, now: now, past: true, fold: !expanded, foldRow: true, peek: peek), height: height, columns: columns)
-    }
-
-    static func pack(_ rows: [WeekRow], height: CGFloat, columns: Int) -> [[WeekRow]] {
-        var cols: [[WeekRow]] = [[]], h: CGFloat = 0
-        for (i, row) in rows.enumerated() {
-            if h + row.height > height {
-                if cols.count == columns { // out of room: end on "+ N more"
-                    var last = cols[cols.count - 1], hidden = rows[i...].filter(\.isItem).count
-                    func used() -> CGFloat { last.map(\.height).reduce(0, +) }
-                    while !last.isEmpty && used() + 20 > height { if last.removeLast().isItem { hidden += 1 } }
-                    while let l = last.last, l.dangles { last.removeLast() } // no heading or now line left hanging
-                    if hidden > 0 { last.append(.more(hidden)) }
-                    cols[cols.count - 1] = last
-                    return cols
-                }
-                cols.append([]); h = 0
-                if row == .now { continue } // a now line never starts a column
-            }
-            cols[cols.count - 1].append(row); h += row.height
-        }
-        return cols
-    }
-}
-
-struct WeekList: View {
-    let store: Store
-    @State private var expanded = false
-    static let time = Date.FormatStyle().hour(.defaultDigits(amPM: .omitted)).minute()
-
-    var body: some View {
-        GeometryReader { g in
-            let narrow = g.size.width < 168, (days, today) = store.week()
-            let cols = WeekLayout.columns(days, today: today, now: .now, height: g.size.height, columns: g.size.width >= 368 ? 2 : 1,
-                                          narrow: narrow, expanded: expanded)
-            HStack(alignment: .top, spacing: 18) {
-                ForEach(cols.indices, id: \.self) { c in
-                    VStack(alignment: .leading, spacing: 0) { ForEach(cols[c].indices, id: \.self) { row(cols[c][$0], narrow: narrow) } }
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder func row(_ r: WeekRow, narrow: Bool) -> some View {
-        switch r {
-        case let .fold(text):
-            HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(Tone.icon(.tasks))
-                Text(text).foregroundStyle(Tone.inkSoft).lineLimit(1)
-                Spacer(minLength: 4)
-                Button(expanded ? "Hide" : "Show") { expanded.toggle() }.buttonStyle(.plain).fontWeight(.semibold).foregroundStyle(Tone.icon(.events))
-            }
-            .font(.footnote).frame(height: 20)
-        case let .day(text, today): heading(text, today: today)
-        case let .empty(text):
-            HStack(spacing: 6) {
-                heading(text, today: text.hasPrefix("TODAY"))
-                Text("Nothing planned").font(.footnote).foregroundStyle(Tone.inkSoft.opacity(0.75)).lineLimit(1).frame(height: 20, alignment: .bottom)
-            }
-        case .nextWeek: heading("NEXT WEEK", today: false)
-        case let .item(i, past): item(i, lead: i.allDay ? "All day" : i.start.map { $0.formatted(Self.time) } ?? "", past: past, narrow: narrow)
-        case let .peek(day, i): item(i, lead: day, past: false, narrow: narrow)
-        case .now:
-            HStack(spacing: 0) { Circle().fill(Tone.now).frame(width: 6, height: 6); Rectangle().fill(Tone.now).frame(height: 1.5) }
-                .padding(.leading, narrow ? 0 : 44).frame(height: 5)
-        case let .more(n): Text("+ \(n) more").font(.footnote).foregroundStyle(Tone.inkSoft).frame(height: 20, alignment: .bottom)
-        }
-    }
-
-    func heading(_ text: String, today: Bool) -> some View {
-        Text(text).font(.footnote.weight(.semibold)).foregroundStyle(today ? Tone.now : Tone.inkSoft).lineLimit(1).frame(height: 20, alignment: .bottom)
-    }
-
-    func item(_ i: WeekItem, lead: String, past: Bool, narrow: Bool) -> some View {
-        let color = i.event ? (i.color ?? Tone.icon(.events)) : Tone.icon(.tasks)
-        return HStack(spacing: 7) {
-            if narrow { Circle().fill(color).frame(width: 7, height: 7) }
-            else {
-                Text(lead).font(.footnote.monospacedDigit()).foregroundStyle(Tone.inkSoft).lineLimit(1).frame(width: 40, alignment: .trailing)
-                RoundedRectangle(cornerRadius: 1.5).fill(color).frame(width: 3, height: 15)
-            }
-            Text(i.title).font(narrow ? .subheadline : .callout).lineLimit(1)
-                .foregroundStyle(i.done || past ? Tone.inkSoft : Tone.ink).strikethrough(i.done, color: Tone.inkSoft)
-            Spacer(minLength: 4)
-            if let m = i.minutes, !narrow, m > 0 { Text(m < 60 ? "\(m)m" : m % 60 == 0 ? "\(m / 60)h" : "\(m / 60)h \(m % 60)m").font(.footnote).foregroundStyle(Tone.inkSoft).lineLimit(1) }
-        }
-        .frame(height: 20)
     }
 }
 

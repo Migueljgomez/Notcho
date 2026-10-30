@@ -394,7 +394,7 @@ struct WorkspaceSettings: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("CARD COLORS").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.pInkSoft)
-                    ForEach(CardKind.allCases) { kind in CardColorRow(store: store, kind: kind) }
+                    ForEach(CardKind.allCases.filter { $0 != .fridge }) { kind in CardColorRow(store: store, kind: kind) }
                     Text("Pastel uses these colors in full; Light uses a soft wash of them. Dark island cards stay dark.")
                         .font(.callout).foregroundStyle(Palette.pInkSoft)
                 }
