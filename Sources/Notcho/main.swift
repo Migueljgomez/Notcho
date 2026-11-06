@@ -607,9 +607,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         planner.keyEquivalentModifierMask = [.option, .shift]
         planner.target = self
         menu.addItem(.separator())
+        menu.addItem(withTitle: "Report a Bug…", action: #selector(reportBug), keyEquivalent: "").target = self
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+        menu.addItem(withTitle: "Notcho \(version)", action: nil, keyEquivalent: "").isEnabled = false
         menu.addItem(withTitle: "Quit Notcho", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem.menu = menu
         NSApp.mainMenu = mainMenu()
+    }
+
+    static let repo = "https://github.com/GITHUB_USER/Notcho"
+
+    /// Opens a new GitHub issue with the version and macOS filled in.
+    @objc func reportBug() {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+        let body = "What happened:\n\nWhat you expected:\n\nNotcho \(version), macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"
+        var url = URLComponents(string: Self.repo + "/issues/new")!
+        url.queryItems = [URLQueryItem(name: "body", value: body)]
+        if let u = url.url { NSWorkspace.shared.open(u) }
     }
 
     /// Shown while the Planner is open; also what makes ⌘C/⌘V/⌘Z/⌘W work in its text fields.

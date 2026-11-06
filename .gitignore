@@ -2,3 +2,4 @@
 .DS_Store
 # old icon backups stay local
 Icon/*-old.*
+dist/
