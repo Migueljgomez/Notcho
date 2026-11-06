@@ -75,12 +75,13 @@ enum FocusPhase: String, Codable { case ready, running, paused, finished }
     var projects: [Project] = [] { didSet { save() } }
     var objectives: [Objective] = [] { didSet { save() } }
     @ObservationIgnored var onTasksChanged: (() -> Void)?   // Apple Reminders sync listens here
+    @ObservationIgnored var onFocusChanged: (() -> Void)?   // the controller ticks every second only while a timer runs
     var notes = "" { didSet { save(); if !loading { onNotesChanged?() } } }
     @ObservationIgnored var onNotesChanged: (() -> Void)?  // DailyNotes mirrors the Notepad into today's dated file
     var focusMinutes = 25 { didSet { save() } }
 
     // Focus session
-    var focusState = FocusPhase.ready { didSet { save() } }
+    var focusState = FocusPhase.ready { didSet { save(); onFocusChanged?() } }
     var focusTaskID: UUID? { didSet { save() } }
     var focusEnd: Date? { didSet { save() } }          // set while running
     var focusRemaining: TimeInterval = 25 * 60 { didSet { save() } } // used while ready/paused

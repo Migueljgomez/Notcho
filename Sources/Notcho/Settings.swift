@@ -32,6 +32,8 @@ enum PlannerLook: String, Codable, CaseIterable { case system = "Match my Mac", 
 
 enum SelectionStyle: String, Codable, CaseIterable { case accent = "Mac accent color", gray = "Soft gray", butter = "Pale butter" }
 
+enum OpenOn: String, Codable, CaseIterable { case hover = "Hover", click = "Click" }
+
 enum CompactStyle: String, Codable, CaseIterable { case rail = "Icon rail", chips = "Live chips" }
 
 enum Unfinished: String, Codable, CaseIterable { case ask = "Ask me", carry = "Move to today", leave = "Leave in history" }
@@ -71,6 +73,7 @@ struct Settings: Codable, Equatable {
     var panelWidth = Double(Metrics.panelWidth)
     var closeAfter = 0.0        // seconds the notch waits after the pointer leaves; `stayOpen` = only click-away, Esc or ✕
     static let stayOpen = 3.5
+    var openOn = OpenOn.hover   // hover = rest the pointer in the notch a moment; click = only a click opens it
     var notchLook = NotchLook.light
     var plannerLook = PlannerLook.system
     var plannerSelection = SelectionStyle.accent  // the selected sidebar row in the Planner
@@ -103,6 +106,7 @@ struct Settings: Codable, Equatable {
         panelHeight = (try? c.decodeIfPresent(Double.self, forKey: .panelHeight)) ?? d.panelHeight
         panelWidth = (try? c.decodeIfPresent(Double.self, forKey: .panelWidth)) ?? d.panelWidth
         closeAfter = (try? c.decodeIfPresent(Double.self, forKey: .closeAfter)) ?? d.closeAfter
+        openOn = (try? c.decodeIfPresent(OpenOn.self, forKey: .openOn)) ?? d.openOn
         notchLook = (try? c.decodeIfPresent(NotchLook.self, forKey: .notchLook)) ?? d.notchLook
         plannerLook = (try? c.decodeIfPresent(PlannerLook.self, forKey: .plannerLook)) ?? d.plannerLook
         plannerSelection = (try? c.decodeIfPresent(SelectionStyle.self, forKey: .plannerSelection)) ?? d.plannerSelection

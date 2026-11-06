@@ -57,6 +57,13 @@ struct CustomizeView: View {
                     .labelsHidden().fixedSize()
                     .onChange(of: store.settings.shortcut) { HotKey.register(store.settings.shortcut) }
                 }
+                row("Open notch") {
+                    Picker("", selection: $store.settings.openOn) {
+                        ForEach(OpenOn.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .labelsHidden().fixedSize()
+                }
+                .help("Hover: rest your pointer in the notch for a moment. Click: only a click opens it.")
                 row("Close after") {
                     Slider(value: $store.settings.closeAfter, in: 0...Settings.stayOpen, step: 0.25).frame(width: 110)
                     Text(closeLabel).font(.callout.monospacedDigit()).frame(width: 64, alignment: .trailing)

@@ -40,6 +40,9 @@ final class NotchController {
     var notch = CGRect.zero, workspace = CGRect.zero, pill = CGRect.zero
     var monitors: [Any] = []
     var collapseTask: Task<Void, Never>?
+    var openTask: Task<Void, Never>?   // hover mode: the notch opens once the pointer rests in it
+    var focusTimer: Timer?
+    var lastHit: [Bool] = []            // pointer state at the last mouse move; unchanged moves skip the work
     var suppressUntilExit = false  // after ✕, don't reopen until the pointer leaves
     var menuOpen = false
     var pinned = false             // opened by the shortcut: stays open until click-outside, Esc, ✕ or hover-out
@@ -86,8 +89,13 @@ final class NotchController {
         panel.contentView = NSHostingView(rootView: RootView(model: model, store: store) { [weak self] in self?.closeButton() })
 
         let moves: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .leftMouseUp]
-        monitors.append(NSEvent.addGlobalMonitorForEvents(matching: moves) { [weak self] _ in self?.trackPointer() } as Any)
-        monitors.append(NSEvent.addLocalMonitorForEvents(matching: moves) { [weak self] e in self?.trackPointer(); return e } as Any)
+        monitors.append(NSEvent.addGlobalMonitorForEvents(matching: moves) { [weak self] _ in self?.trackPointer(moved: true) } as Any)
+        monitors.append(NSEvent.addLocalMonitorForEvents(matching: moves) { [weak self] e in self?.trackPointer(moved: true); return e } as Any)
+        // A click on the closed notch opens it, in either Open notch mode.
+        monitors.append(NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] e in
+            if let self, !model.expanded, notch.contains(NSEvent.mouseLocation) { openTask?.cancel(); setExpanded(true) }
+            return e
+        } as Any)
         // A click anywhere outside the panel closes it.
         monitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             if self?.model.expanded == true { self?.setExpanded(false) }
@@ -127,15 +135,10 @@ final class NotchController {
             Timebox.shared.schedule() // blocks moved or deleted in Calendar (Mac or phone)
         }
 
-        // 1 s tick: finish the focus timer; reload events each minute.
-        var ticks = 0
-        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            if store.tick() && store.settings.completionSound { NSSound(named: "Glass")?.play() }
-            ticks += 1
-            if ticks % 60 == 0 { minuteChores() }
-            trackPointer() // pill appears/disappears with the timer state
-        }
+        // Calendar, rollover and nudges once a minute; the 1 s tick only runs while a focus timer does (battery).
+        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.minuteChores() }.tolerance = 5
+        store.onFocusChanged = { [weak self] in self?.scheduleFocusTick(); self?.trackPointer() } // pill appears/disappears with the timer state
+        scheduleFocusTick()
 
         // Clicking a reminder notification opens the panel (pinned, like the shortcut).
         ReminderService.shared.setUp()
@@ -147,6 +150,19 @@ final class NotchController {
 
         minuteChores()
         layout()
+    }
+
+    /// Finishes the focus timer on time; stopped whenever no timer is running.
+    func scheduleFocusTick() {
+        let running = store.focusState == .running
+        guard running != (focusTimer != nil) else { return }
+        focusTimer?.invalidate(); focusTimer = nil
+        guard running else { return }
+        focusTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            if store.tick() && store.settings.completionSound { NSSound(named: "Glass")?.play() }
+        }
+        focusTimer?.tolerance = 0.1
     }
 
     /// Calendar refresh, new-day rollover of unfinished tasks, notification permission status.
@@ -213,9 +229,12 @@ final class NotchController {
         return [notch, p]
     }
 
-    func trackPointer() {
+    func trackPointer(moved: Bool = false) {
         let p = NSEvent.mouseLocation
         let inside = surfaces.contains { $0.contains(p) }
+        let hit = [inside, notch.contains(p), model.expanded, model.dragging]
+        if moved && hit == lastHit { return } // most moves change nothing here
+        lastHit = hit
         panel.ignoresMouseEvents = !inside && !model.dragging  // clicks outside the shape fall through to apps below
         if !inside { suppressUntilExit = false }
         // The timer pill takes clicks (pause/resume) but doesn't open the notch; only the notch itself does.
@@ -225,9 +244,16 @@ final class NotchController {
 
     func setHover(_ inside: Bool) {
         collapseTask?.cancel()
+        openTask?.cancel()
         if inside {
             pinned = false // the pointer is here now, so normal hover rules take over
-            if !model.expanded { setExpanded(true) }
+            guard !model.expanded, store.settings.openOn == .hover else { return } // click mode: the click monitor opens it
+            // A short rest, so sweeping across the top of the screen doesn't open it.
+            openTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(300))
+                guard !Task.isCancelled else { return }
+                self?.setExpanded(true)
+            }
         } else if pinned || store.settings.closeAfter >= Settings.stayOpen {
             return
         } else if model.expanded && !model.editing && !model.dragging && !menuOpen && panel.childWindows?.isEmpty != false {
@@ -477,7 +503,7 @@ if CommandLine.arguments.contains("--selftest") {
     // Saved data from before a change still loads; settings saved without a newer field take its default, and retired fields are ignored
     if let data = try? Data(contentsOf: Store.fileURL) { precondition(Store.loads(data), "store.json no longer loads") }
     let oldSettings = try! JSONDecoder().decode(Settings.self, from: Data(#"{"timerMenu":false,"eventsWeek":true}"#.utf8))
-    precondition(oldSettings.timerMenu == false)
+    precondition(oldSettings.timerMenu == false && oldSettings.openOn == .hover)
     // Fridge: settings saved before it existed add it last; five cards step aside Notepad, Fridge, Focus, Events
     let oldOrder = try! JSONDecoder().decode(Settings.self, from: Data(#"{"cardOrder":["events","tasks","focus","notepad"]}"#.utf8))
     precondition(oldOrder.orderedCards == [.events, .tasks, .focus, .notepad, .fridge])

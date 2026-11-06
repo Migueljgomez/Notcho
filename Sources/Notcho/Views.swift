@@ -143,6 +143,7 @@ struct RootView: View {
         ZStack(alignment: .topLeading) {
             WorkspaceView(model: model, store: store, close: close)
                 .id(store.settings.notchLook) // re-resolve every color when the look changes
+                .environment(\.notchOpen, model.expanded)
                 .frame(width: model.workspace.width, height: model.workspace.height)
                 .opacity(model.expanded ? 1 : 0)
                 .animation(model.expanded ? .easeOut(duration: 0.12).delay(0.2) : .easeOut(duration: 0.08), value: model.expanded)
@@ -184,7 +185,7 @@ struct TimerPill: View {
         let paused = store.focusState == .paused
         let showX = paused && hover && store.settings.timerHoverStop
         HStack(spacing: 8) {
-            TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
+            TimelineView(.animation(minimumInterval: 1, paused: store.focusState != .running || model.expanded)) { ctx in
                 DotMatrix(text: clock(store.display(at: ctx.date)), dot: 1.9, color: .white.opacity(paused ? 0.45 : 0.9)) // dim = paused
             }
             .contentShape(Rectangle())
@@ -503,6 +504,12 @@ struct PagePicker: View {
     }
 }
 
+/// False while the notch is closed: its cards stay in place, invisible, so their clocks pause instead of redrawing. The Planner keeps the default.
+struct NotchOpenKey: EnvironmentKey { static let defaultValue = true }
+extension EnvironmentValues {
+    var notchOpen: Bool { get { self[NotchOpenKey.self] } set { self[NotchOpenKey.self] = newValue } }
+}
+
 /// A Workspace card's dot handle reports drags here: a value while dragging, nil when let go.
 struct CardGripKey: EnvironmentKey { static let defaultValue: ((DragGesture.Value?) -> Void)? = nil }
 extension EnvironmentValues {
@@ -592,6 +599,7 @@ struct TasksCard: View {
     @State private var reminderTaskID: UUID?
     @State private var hoverClock: UUID?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.notchOpen) private var notchOpen
 
     var body: some View {
         Card(color: Tone.tasks) {
@@ -678,7 +686,7 @@ struct TasksCard: View {
     /// The Focus card's timer icon. On the task being timed, a ring fills with the session's progress and the icon pulses while it runs.
     func focusIcon(_ task: TaskItem) -> some View {
         let timing = store.focusTaskID == task.id && store.focusState != .ready
-        return TimelineView(.periodic(from: .now, by: 1)) { ctx in
+        return TimelineView(.animation(minimumInterval: 1, paused: !timing || store.focusState != .running || !notchOpen)) { ctx in
             let goal = store.isStopwatch ? TimeInterval(store.focusMinutes * 60) : store.focusTotal
             let done = timing && goal > 0 ? min(1, store.spent(at: ctx.date) / goal) : 0
             Image(systemName: "timer").font(.callout.weight(.semibold)).foregroundStyle(timing ? Tone.accent : Tone.ink)
@@ -904,12 +912,13 @@ struct CompleteButton: View {
 struct FocusCard: View {
     let store: Store
     @State private var showSetTime = false
+    @Environment(\.notchOpen) private var notchOpen
 
     var body: some View {
         Card(color: Tone.focus) {
             CardHeader(icon: "timer", title: "Focus", tint: Tone.icon(.focus))
             // Minutes over seconds when the card is tall; one line ("18:12") when it's short. Whichever gives bigger dots.
-            TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
+            TimelineView(.animation(minimumInterval: 1, paused: store.focusState != .running || !notchOpen)) { ctx in
                 let text = clock(store.display(at: ctx.date))
                 GeometryReader { g in
                     let line = max(2, min(g.size.width / 37, g.size.height / 10.5))  // 25 columns, 7 rows
@@ -1196,9 +1205,10 @@ struct Aside<Content: View>: View {
     let items: (Date) -> [DeckItem]
     let pick: (String) -> Void
     @ViewBuilder let content: () -> Content
+    @Environment(\.notchOpen) private var notchOpen
 
     var body: some View {
-        let picker = TimelineView(.periodic(from: .now, by: 1)) { ctx in
+        let picker = TimelineView(.animation(minimumInterval: 1, paused: !notchOpen)) { ctx in
             let list = items(ctx.date)
             if style == .rail {
                 VStack(spacing: 6) { ForEach(list) { rail($0, on: $0.id == current) }; Spacer(minLength: 0) }
