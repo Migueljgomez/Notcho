@@ -615,7 +615,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = mainMenu()
     }
 
-    static let repo = "https://github.com/GITHUB_USER/Notcho"
+    static let repo = "https://github.com/Migueljgomez/Notcho"
 
     /// Opens a new GitHub issue with the version and macOS filled in.
     @objc func reportBug() {
