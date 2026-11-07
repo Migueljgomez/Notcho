@@ -8,6 +8,12 @@ It works with the AI you already use. Claude, Codex and other AI tools can read 
 
 Everything stays on your Mac. No account, no server, no tracking.
 
+![Tell your AI to add a task. It lands in Today and on your calendar.](docs/ai-adds-a-task.gif)
+
+![The notch opens, then Plan your day sizes the day to your hours.](docs/plan-your-day.gif)
+
+![Drag a file from the Fridge straight into an email.](docs/fridge-to-email.gif)
+
 ## What you'll need
 
 | To... | You need |
