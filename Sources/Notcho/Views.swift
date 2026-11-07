@@ -565,13 +565,15 @@ struct CardHeader: View {
     let icon: String?, title: String
     var tint: Color = Tone.ink
     var body: some View {
-        HStack(spacing: 6) {
-            // Icons start on the card's 16 pt text line in a fixed 16 pt column, so every title starts at 38 pt.
+        HStack(spacing: 4) {
+            // Symbols run 16 to 22 pt wide at title3 (fridge narrowest, checklist widest). Each sits in one 22 pt square,
+            // against its right edge and centered on the title's line, so every icon is the same distance from its title
+            // and every title starts 26 pt past the card's text line.
             // square.and.pencil's pencil makes it draw 1 pt low and right of the others (measured): nudge it back.
             if let icon {
                 Image(systemName: icon).font(.title3.weight(.semibold)).foregroundStyle(tint)
                     .offset(x: icon == "square.and.pencil" ? -1 : 0, y: icon == "square.and.pencil" ? -1 : 0)
-                    .frame(width: 16, alignment: .leading)
+                    .frame(width: 22, height: 22, alignment: .trailing)
             }
             Text(title).font(.title2.weight(.semibold))
         }
