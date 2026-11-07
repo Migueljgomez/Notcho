@@ -65,6 +65,26 @@ args = ["cli", "mcp"]
 
 Restart the AI app, then try: *"Add 'Send portfolio to Julia' at 3 PM to my notch."*
 
+## Planning skill
+
+Notcho comes with a planning skill for your AI. Tell it what you need to get done and it breaks the work into tasks with estimates and subtasks, fits them into the time you actually have, blocks time on your calendar and leaves a short handoff on the project's plan page. It plans in your style: today, by a date, a 1 to 2 week sprint, milestones, or a brain dump, and remembers which one you picked.
+
+To install it, connect your AI first (above), then copy the skill folder from this repo:
+
+**Claude Code:**
+
+```bash
+cp -R skills/notcho-planner ~/.claude/skills/
+```
+
+**Codex:**
+
+```bash
+cp -R skills/notcho-planner ~/.codex/skills/
+```
+
+Restart the AI app, then try: *"Plan the Website Redesign so it ships by Friday."*
+
 ## Make it yours
 
 Notcho is meant to be changed. Don't like something? Ask your AI agent to change it. A new skin, a different layout, a new card: open this folder in Claude Code, Codex or any coding agent and describe what you want. [AGENTS.md](AGENTS.md) tells the agent how the app is built and how to rebuild it.
